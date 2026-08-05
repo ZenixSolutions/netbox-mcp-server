@@ -8,8 +8,10 @@
   "include": [
     "src/**/*",
     "tests/**/*",
+    "evals/**/*",
     "eslint.config.js",
     "vitest.config.ts",
-    "vitest.contract.config.ts"
+    "vitest.contract.config.ts",
+    "vitest.eval.config.ts"
   ]
 }

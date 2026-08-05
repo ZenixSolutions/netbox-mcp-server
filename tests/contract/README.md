@@ -72,11 +72,17 @@ The suite sends exactly one create and one delete, purely to observe the
 refusal. Three independent guards:
 
 1. **`global-setup.ts` proves the token cannot write, before any test file
-   loads**, using two side-effect-free probes: `GET /api/users/tokens/` matched
-   against the configured key, and `OPTIONS` on a collection — DRF's
-   `SimpleMetadata.determine_actions` re-runs the POST permission check under a
-   cloned request and only advertises `actions.POST` when it passes. If either
-   says the token can write, the run **aborts**.
+   loads**, using two side-effect-free probes. `GET /api/users/tokens/` matches
+   our own row and reads `write_enabled`; it is the only probe that can prove a
+   token is read-only, and it identifies both 4.6 `nbt_<identifier>.<secret>`
+   tokens (the API returns the identifier **prefix**) and legacy 40-character
+   ones. `OPTIONS` on a collection is **positive evidence only**: DRF's
+   `determine_actions` re-runs the POST permission check under a cloned request,
+   so `POST` in `actions` proves the token _can_ write — but `actions` is also
+   omitted for reasons unrelated to permission, so its absence proves nothing.
+   (NetBox 4.6 returns `actions` as an array of method names, not DRF's
+   method-keyed object; both shapes are read.) If either probe says the token
+   can write, the run **aborts**.
 2. **`requireReadOnlyToken()`** throws unless that determination was positive.
    An _indeterminate_ probe skips the write tests rather than guessing.
 3. **The requests themselves cannot mutate anything even against a read-write
