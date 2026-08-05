@@ -1,0 +1,96 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: validate (node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ["20", "22"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      # NODE_ENV is honoured by `npm ci`; a production value silently omits
+      # devDependencies and every step below then fails for the wrong reason.
+      - name: Install
+        run: npm ci
+        env:
+          NODE_ENV: development
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Format check
+        run: npm run format:check
+
+      # Build BEFORE test. `tests/installation/package-contents.test.ts` asks
+      # `npm pack` what would be published, and `files` points at `dist` — with
+      # no build the tarball is documents only and the test fails for a reason
+      # that has nothing to do with the change. It passed locally purely
+      # because a previous build had left `dist/` lying around.
+      - name: Build
+        run: npm run build
+
+      - name: Test
+        run: npm run test -- --coverage
+
+      # The published package is the contract. Verify the CLI contract against
+      # the built artifact, not the source tree.
+      - name: Smoke test the built binary
+        run: |
+          node dist/index.js --version
+          node dist/index.js --list-tools > /dev/null
+          set +e
+          node dist/index.js --check
+          code=$?
+          set -e
+          if [ "$code" -ne 78 ]; then
+            echo "::error::--check must exit 78 with no configuration, got $code"
+            exit 1
+          fi
+
+  secrets:
+    name: secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # The gitleaks CLI is open source and free. gitleaks-action is not: for a
+      # repository owned by an organization it fails with "License key is
+      # required", which is a billing message wearing the costume of a security
+      # finding. Run the scanner directly and keep the check meaningful.
+      - name: Install gitleaks
+        env:
+          GITLEAKS_VERSION: "8.28.0"
+        run: |
+          curl -sSfL \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
+            | tar -xz -C /usr/local/bin gitleaks
+          gitleaks version
+
+      - name: Scan history for secrets
+        run: gitleaks detect --source . --redact --verbose --exit-code 1

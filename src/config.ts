@@ -9,11 +9,7 @@
  *   NETBOX_INSECURE - "1"/"true"/"yes" to skip TLS verification
  */
 
-import {
-  ENV_NETBOX_INSECURE,
-  ENV_NETBOX_TOKEN,
-  ENV_NETBOX_URL,
-} from "./constants.js";
+import { ENV_NETBOX_INSECURE, ENV_NETBOX_TOKEN, ENV_NETBOX_URL } from "./constants.js";
 
 export interface NetBoxConfig {
   /** Fully qualified base URL, no trailing slash. */
@@ -59,8 +55,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): NetBoxConfig {
 
   try {
     // Validate URL shape.
-    // eslint-disable-next-line no-new
-    new URL(baseUrl);
+    void new URL(baseUrl);
   } catch {
     throw new Error(
       `${ENV_NETBOX_URL} is not a valid URL: "${rawUrl}". ` +

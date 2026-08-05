@@ -6,9 +6,15 @@
     "lib": ["ES2022"],
     "outDir": "./dist",
     "rootDir": "./src",
+
     "strict": true,
     "noImplicitAny": true,
-    "noUnusedLocals": false,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": false,
+
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
