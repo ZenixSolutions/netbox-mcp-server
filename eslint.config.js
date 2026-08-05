@@ -13,7 +13,7 @@ export default tseslint.config(
   {
     // Type-checked rules apply only to files the TypeScript project knows
     // about. Applying them globally makes ESLint fail on its own config file.
-    files: ["src/**/*.ts", "tests/**/*.ts"],
+    files: ["src/**/*.ts", "tests/**/*.ts", "evals/**/*.ts"],
     extends: [...tseslint.configs.recommendedTypeChecked],
     languageOptions: {
       parserOptions: {
@@ -54,7 +54,7 @@ export default tseslint.config(
   },
 
   {
-    files: ["tests/**/*.ts"],
+    files: ["tests/**/*.ts", "evals/**/*.ts"],
     rules: { "no-console": "off" },
   },
 
