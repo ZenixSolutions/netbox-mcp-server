@@ -45,7 +45,15 @@ import { stateDir, statePath } from "../contract/observations.js";
 /* an array of method names.                                                  */
 /* ------------------------------------------------------------------------ */
 
-/** A live NetBox 4.6 token. `key` is the 12-character identifier PREFIX. */
+/**
+ * A NetBox 4.6 token, shaped `nbt_<identifier>.<secret>`; `key` is the
+ * 12-character identifier PREFIX, which is the whole point of these tests.
+ *
+ * FABRICATED. Never put a real token here, even a revoked one: this file is
+ * public, and a commit stays reachable by SHA once a pull request has
+ * referenced it, so a force-push does not take it back. An earlier revision
+ * of this file did exactly that and the secret scan caught it.
+ */
 const V2_TOKEN = "nbt_EXAMPLEID001.EXAMPLESECRETdoNotUseThisValueItIsFake00";
 const V2_KEY = "EXAMPLEID001";
 
