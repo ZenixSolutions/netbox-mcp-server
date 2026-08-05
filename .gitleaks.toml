@@ -1,0 +1,30 @@
+# gitleaks configuration.
+#
+# The secret scan is not decoration. On its first real run it caught a genuine
+# NetBox API token that had been pasted into a test fixture and pushed to this
+# public repository. Keep it strict.
+#
+# The allowlist below matches EXACT FABRICATED VALUES, not paths and not file
+# patterns. That distinction is the whole point: excluding
+# `tests/unit/token-capability.test.ts` wholesale would have suppressed the
+# very finding that mattered, in the very file where it happened. Any other
+# secret-shaped string in that file — or a real token pasted over one of
+# these — still trips the scanner.
+#
+# If you add a fixture that looks like a credential, make it obviously fake,
+# then add its exact value here. Do not add a path.
+
+title = "netbox-mcp-server"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Fabricated credential fixtures used by the token-capability tests"
+regexTarget = "match"
+regexes = [
+  # NetBox 4.6 v2 token shape, nbt_<identifier>.<secret>. Fabricated.
+  '''nbt_EXAMPLEID001\.EXAMPLESECRETdoNotUseThisValueItIsFake00''',
+  # Pre-4.6 token shape, 40 hex characters. Fabricated: 0-f repeating.
+  '''0123456789abcdef0123456789abcdef01234567''',
+]

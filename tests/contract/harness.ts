@@ -14,6 +14,7 @@
  *     fail, so the report shows what was verified and not only what broke.
  */
 
+import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 
 import { buildRegistry, type SchemaRegistry } from "../../src/schema/registry.js";
@@ -30,6 +31,7 @@ import {
   asRecord,
   asString,
   type HttpResult,
+  parseJson,
   request,
 } from "./http.js";
 
@@ -164,21 +166,188 @@ export interface PreflightState {
   netboxVersion: string | null;
   plugins: Record<string, string>;
   probedAt: string;
+  /**
+   * Which token the determination was made about — a salted digest, never the
+   * token. State is keyed by base URL alone, so without this a determination
+   * made for one token could be reused for another.
+   */
+  tokenFingerprint?: string | undefined;
+}
+
+/**
+ * A non-reversible, non-guessable stand-in for a token, for the state file.
+ *
+ * The digest is over the token only; it is never printed, only compared. It
+ * exists so a preflight determination cannot be silently reused for a
+ * different token against the same instance.
+ */
+export function tokenFingerprint(token: string): string {
+  return createHash("sha256").update(`netbox-mcp-contract:${token}`).digest("hex");
+}
+
+/* -- Identifying our own row in /api/users/tokens/ ------------------------- */
+
+/** NetBox 4.6's token scheme prefix. */
+const V2_TOKEN_PREFIX = "nbt_";
+
+/**
+ * The identifier segment of a NetBox 4.6 token, or `undefined` for a legacy one.
+ *
+ * 4.6 issues tokens shaped `nbt_<identifier>.<secret>`, and
+ * `GET /api/users/tokens/` returns only the `<identifier>` in `key`. That is a
+ * PREFIX of the token, not a suffix: the legacy "last 6 characters" heuristic
+ * below cannot see it, which is why this exists.
+ *
+ * Pre-4.6 tokens are 40 opaque characters with no scheme prefix and no
+ * separator, and the API returns the whole thing (subject to
+ * `ALLOW_TOKEN_RETRIEVAL`), so they take the legacy path.
+ */
+export function v2TokenIdentifier(token: string): string | undefined {
+  if (!token.startsWith(V2_TOKEN_PREFIX)) return undefined;
+  const rest = token.slice(V2_TOKEN_PREFIX.length);
+  const separator = rest.indexOf(".");
+  // `<= 0` covers both "no separator" and "empty identifier".
+  if (separator <= 0) return undefined;
+  return rest.slice(0, separator);
+}
+
+/**
+ * The outcome of looking for the configured token in a token list.
+ *
+ * `ambiguous` is deliberately distinct from `matched`: more than one candidate
+ * row means we do not know which one is us, and guessing could report
+ * `write_enabled = false` for a token that can in fact write.
+ */
+export type TokenRowMatch =
+  | { kind: "matched"; row: Record<string, unknown>; how: string }
+  | { kind: "ambiguous"; count: number; how: string }
+  | { kind: "none"; how: string };
+
+function soleMatch(hits: readonly Record<string, unknown>[], how: string): TokenRowMatch {
+  const first = hits[0];
+  if (hits.length === 1 && first !== undefined)
+    return { kind: "matched", row: first, how };
+  if (hits.length > 1) return { kind: "ambiguous", count: hits.length, how };
+  return { kind: "none", how };
+}
+
+/**
+ * Find the row in `/api/users/tokens/` that is the configured token.
+ *
+ * Strict by construction: every row that could be the token is collected, and
+ * only a single candidate counts as an identification. Two rows that both look
+ * like us is `ambiguous`, which the caller must treat as indeterminate.
+ */
+export function matchTokenRow(
+  rows: readonly Record<string, unknown>[],
+  token: string,
+): TokenRowMatch {
+  const identifier = v2TokenIdentifier(token);
+  if (identifier !== undefined) {
+    // A v2 token is identified by its identifier segment, exactly. The legacy
+    // suffix heuristic is NOT applied here: the visible portion is a prefix, so
+    // a suffix comparison could only ever match by accident.
+    const hits = rows.filter((row) => {
+      const key = asString(row["key"]);
+      return key !== undefined && (key === identifier || key === token);
+    });
+    return soleMatch(hits, "the nbt_<identifier> segment");
+  }
+
+  const exact = rows.filter((row) => asString(row["key"]) === token);
+  if (exact.length > 0) return soleMatch(exact, "full key equality");
+
+  // Legacy fallback: some instances return only the tail of a 40-character key.
+  const suffix = rows.filter((row) => {
+    const key = asString(row["key"]);
+    return key !== undefined && key.length >= 6 && token.endsWith(key.slice(-6));
+  });
+  return soleMatch(suffix, "the legacy 6-character key suffix");
+}
+
+/**
+ * The write methods an OPTIONS response advertises, or `undefined` when it
+ * advertises no `actions` at all.
+ *
+ * Two shapes occur in the wild and both must be understood:
+ *
+ *  - DRF `SimpleMetadata`: `actions` is an OBJECT keyed by method, whose values
+ *    are per-field metadata — `{"POST": {"name": {...}}}`.
+ *  - NetBox 4.6: `actions` is a bare ARRAY of method names — `["POST", "PUT"]`.
+ *
+ * `asRecord()` returns `undefined` for arrays by design, so reading `actions`
+ * with it alone silently discards the 4.6 shape.
+ */
+export function actionMethods(value: unknown): string[] | undefined {
+  const array = asArray(value);
+  if (array) {
+    const methods: string[] = [];
+    for (const entry of array) {
+      const method = asString(entry);
+      if (method !== undefined) methods.push(method.toUpperCase());
+    }
+    return methods;
+  }
+  const record = asRecord(value);
+  if (record) return Object.keys(record).map((method) => method.toUpperCase());
+  return undefined;
+}
+
+/** A description that claims read-only, e.g. "Read Only Temp Token". */
+const CLAIMS_READ_ONLY = /\bread[\s._-]*only\b/i;
+
+/**
+ * Descriptions of rows that say "read only" while `write_enabled` is true.
+ *
+ * Worth surfacing even when it is not our token: a human who trusts these
+ * descriptions will hand out a writable token believing it is safe.
+ */
+export function mislabelledReadOnlyTokens(
+  rows: readonly Record<string, unknown>[],
+): string[] {
+  const out: string[] = [];
+  for (const row of rows) {
+    if (row["write_enabled"] !== true) continue;
+    const description = asString(row["description"]) ?? "";
+    if (CLAIMS_READ_ONLY.test(description)) out.push(description);
+  }
+  return out;
+}
+
+function describeNoMatch(rows: readonly Record<string, unknown>[], how: string): string {
+  if (rows.length === 0) {
+    return "/api/users/tokens/ returned no tokens at all for this user";
+  }
+  const withKeys = rows.filter((row) => asString(row["key"]) !== undefined).length;
+  if (withKeys === 0) {
+    return (
+      `/api/users/tokens/ returned ${rows.length} token(s), none of which carried a \`key\` ` +
+      "field at all — this instance has ALLOW_TOKEN_RETRIEVAL off"
+    );
+  }
+  return (
+    `/api/users/tokens/ returned ${rows.length} token(s), ${withKeys} with a \`key\`, none ` +
+    `matching this token by ${how} — the configured token most likely belongs to a ` +
+    "different user, whose tokens this endpoint does not list"
+  );
 }
 
 /**
  * Establish whether this token can write, WITHOUT writing anything.
  *
- * Two independent probes:
+ * Two probes, of very different strength:
  *
- *  1. `GET /api/users/tokens/` and match the configured key. Authoritative
- *     when the instance returns keys — but NetBox's `ALLOW_TOKEN_RETRIEVAL`
- *     defaults to off on modern versions, so this often cannot identify us.
- *  2. `OPTIONS` on a collection. DRF's `SimpleMetadata.determine_actions`
- *     re-runs the permission check for POST under a cloned request and only
- *     emits `actions.POST` when it passes. NetBox's `TokenPermissions` denies
- *     unsafe methods for a token with `write_enabled = false`, so the absence
- *     of `actions.POST` is real evidence, and it mutates nothing.
+ *  1. `GET /api/users/tokens/`, matching our own row and reading
+ *     `write_enabled`. This is the ONLY probe that can prove a token is
+ *     read-only, and it is authoritative in both directions.
+ *  2. `OPTIONS` on a collection. DRF's `determine_actions` re-runs the POST
+ *     permission check under a cloned request, so `POST` appearing in
+ *     `actions` PROVES the token can write. The converse does NOT hold:
+ *     `SimpleMetadata` omits `actions` whenever the view exposes no serializer
+ *     or `determine_actions` yields nothing, and NetBox customises the metadata
+ *     class, so an absent or POST-less `actions` is no evidence either way.
+ *     This probe is therefore used only to say "yes it can write", never "no it
+ *     cannot", and it mutates nothing.
  *
  * Either probe reporting write access is enough to abort.
  */
@@ -188,53 +357,86 @@ export async function probeTokenCapability(): Promise<TokenCapability> {
 
   const tokens = await api("/users/tokens/?limit=200");
   if (tokens.status === 200) {
-    const payload = asRecord(JSON.parse(tokens.body) as unknown);
-    const results = asArray(payload?.["results"]) ?? [];
-    let matched: Record<string, unknown> | undefined;
-    for (const entry of results) {
-      const row = asRecord(entry);
-      const key = asString(row?.["key"]);
-      if (key === undefined) continue;
-      const sameKey =
-        key === configured.token ||
-        (key.length >= 6 && configured.token.endsWith(key.slice(-6)));
-      if (sameKey) matched = row;
-    }
-    if (matched) {
-      const writeEnabled = matched["write_enabled"];
-      if (typeof writeEnabled === "boolean") {
-        return {
-          writeEnabled,
-          source: "GET /api/users/tokens/",
-          detail: `matched this token; write_enabled = ${String(writeEnabled)}`,
-        };
-      }
-      notes.push("/api/users/tokens/ matched this token but omitted write_enabled");
+    const payload = asRecord(parseJson(tokens.body));
+    if (payload === undefined) {
+      notes.push("GET /api/users/tokens/ returned 200 but the body is not a JSON object");
     } else {
-      notes.push(
-        `/api/users/tokens/ returned ${results.length} token(s), none identifiable as this one ` +
-          "(ALLOW_TOKEN_RETRIEVAL is probably off)",
-      );
+      const rows: Record<string, unknown>[] = [];
+      for (const entry of asArray(payload["results"]) ?? []) {
+        const row = asRecord(entry);
+        if (row !== undefined) rows.push(row);
+      }
+
+      const count = asNumber(payload["count"]);
+      if (count !== undefined && count > rows.length) {
+        notes.push(
+          `/api/users/tokens/ is paginated: ${count} token(s) exist but only ${rows.length} ` +
+            "were inspected, so this token may simply be on a later page",
+        );
+      }
+
+      const mislabelled = mislabelledReadOnlyTokens(rows);
+      const warning =
+        mislabelled.length === 0
+          ? ""
+          : `WARNING: ${mislabelled.length} of ${rows.length} token(s) on this instance have ` +
+            "write_enabled = true while describing themselves as read-only " +
+            `[${mislabelled.map((text) => JSON.stringify(text)).join(", ")}] — token ` +
+            "descriptions here do not reflect capability";
+
+      const match = matchTokenRow(rows, configured.token);
+      if (match.kind === "matched") {
+        const writeEnabled = match.row["write_enabled"];
+        if (typeof writeEnabled === "boolean") {
+          return {
+            writeEnabled,
+            source: "GET /api/users/tokens/",
+            detail:
+              `matched this token by ${match.how}; write_enabled = ${String(writeEnabled)}` +
+              (warning === "" ? "" : `; ${warning}`),
+          };
+        }
+        notes.push(
+          `/api/users/tokens/ matched this token by ${match.how} but omitted write_enabled`,
+        );
+      } else if (match.kind === "ambiguous") {
+        notes.push(
+          `/api/users/tokens/ returned ${match.count} rows that all match this token by ` +
+            `${match.how}; refusing to guess which one it is`,
+        );
+      } else {
+        notes.push(describeNoMatch(rows, match.how));
+      }
+      if (warning !== "") notes.push(warning);
     }
   } else {
     notes.push(`GET /api/users/tokens/ returned HTTP ${tokens.status}`);
   }
 
+  // Positive evidence only — see this function's doc comment. A missing `POST`
+  // is recorded as a note and never returned as `writeEnabled: false`.
   const options = await api("/dcim/sites/", { method: "OPTIONS" });
   if (options.status === 200) {
-    const payload = asRecord(JSON.parse(options.body) as unknown);
-    const actions = asRecord(payload?.["actions"]);
-    if (actions) {
-      const canPost = Object.prototype.hasOwnProperty.call(actions, "POST");
+    const payload = asRecord(parseJson(options.body));
+    const methods = actionMethods(payload?.["actions"]);
+    if (methods === undefined) {
+      notes.push(
+        "OPTIONS /api/dcim/sites/ advertised no `actions`, which proves nothing either way",
+      );
+    } else if (methods.includes("POST")) {
       return {
-        writeEnabled: canPost,
+        writeEnabled: true,
         source: "OPTIONS /api/dcim/sites/",
         detail:
-          `DRF metadata advertises actions [${Object.keys(actions).join(", ") || "none"}]` +
+          `metadata advertises actions [${methods.join(", ")}], including POST` +
           (notes.length > 0 ? `; ${notes.join("; ")}` : ""),
       };
+    } else {
+      notes.push(
+        `OPTIONS /api/dcim/sites/ advertises actions [${methods.join(", ") || "none"}] with ` +
+          "no POST — consistent with a read-only token, but not proof of one",
+      );
     }
-    notes.push("OPTIONS /api/dcim/sites/ returned no `actions` object");
   } else {
     notes.push(`OPTIONS /api/dcim/sites/ returned HTTP ${options.status}`);
   }
@@ -246,20 +448,65 @@ export async function probeTokenCapability(): Promise<TokenCapability> {
   };
 }
 
+/**
+ * Read the state the global setup wrote, narrowing it rather than casting.
+ *
+ * Anything unrecognised degrades to `undefined`, which callers treat as "no
+ * determination" — the safe direction.
+ */
 export function readPreflightState(): PreflightState | undefined {
+  let parsed: Record<string, unknown> | undefined;
   try {
-    const raw = readFileSync(statePath(env().baseUrl), "utf8");
-    const parsed = asRecord(JSON.parse(raw) as unknown);
-    if (!parsed) return undefined;
-    return parsed as unknown as PreflightState;
+    parsed = asRecord(parseJson(readFileSync(statePath(env().baseUrl), "utf8")));
   } catch {
     return undefined;
   }
+  if (parsed === undefined) return undefined;
+
+  const capability = asRecord(parsed["capability"]);
+  if (capability === undefined) return undefined;
+  const writeEnabled = capability["writeEnabled"];
+  if (writeEnabled !== true && writeEnabled !== false && writeEnabled !== undefined) {
+    return undefined;
+  }
+
+  const plugins: Record<string, string> = {};
+  for (const [name, value] of Object.entries(asRecord(parsed["plugins"]) ?? {})) {
+    plugins[name] = asString(value) ?? String(value);
+  }
+
+  return {
+    capability: {
+      writeEnabled,
+      source: asString(capability["source"]) ?? "unknown",
+      detail: asString(capability["detail"]) ?? "",
+    },
+    netboxVersion: asString(parsed["netboxVersion"]) ?? null,
+    plugins,
+    probedAt: asString(parsed["probedAt"]) ?? "",
+    tokenFingerprint: asString(parsed["tokenFingerprint"]),
+  };
 }
 
 export function writePreflightState(baseUrl: string, state: PreflightState): void {
   writeFileSync(statePath(baseUrl), JSON.stringify(state, null, 2), "utf8");
 }
+
+const INDETERMINATE_GUIDANCE = [
+  "",
+  "Only GET /api/users/tokens/ can prove a token is READ-ONLY. To make that probe work:",
+  "  - the configured token must belong to the user it authenticates as — NetBox lists",
+  "    only that user's own tokens, so a token created for someone else is invisible;",
+  "  - that user needs permission to read /api/users/tokens/;",
+  "  - on NetBox 4.6+ the `key` field carries the `nbt_<identifier>` segment and needs no",
+  "    extra setting. On older versions the whole 40-character key is only returned when",
+  "    the instance sets ALLOW_TOKEN_RETRIEVAL = True;",
+  "  - if several rows matched, exactly one must be identifiable — the guard will not",
+  "    guess between candidates.",
+  "",
+  "OPTIONS metadata cannot close this gap: `actions.POST` proves a token CAN write, but",
+  "its absence is not proof that it cannot.",
+].join("\n");
 
 /**
  * Refuse to proceed unless the token was PROVEN unable to write.
@@ -276,6 +523,16 @@ export function requireReadOnlyToken(): string {
         "global setup executes.",
     );
   }
+  if (
+    state.tokenFingerprint !== undefined &&
+    state.tokenFingerprint !== tokenFingerprint(env().token)
+  ) {
+    throw new Error(
+      "The preflight state on disk was recorded for a DIFFERENT token against this same " +
+        "instance. It says nothing about the token now configured. Re-run the suite through " +
+        "`npm run test:contract` so the global setup re-probes.",
+    );
+  }
   if (state.capability.writeEnabled === true) {
     throw new Error(
       "This token can WRITE. No write probe may run. (The global setup should already " +
@@ -284,10 +541,8 @@ export function requireReadOnlyToken(): string {
   }
   if (state.capability.writeEnabled === undefined) {
     throw new Error(
-      "Token write capability is indeterminate: " +
-        `${state.capability.detail}. Refusing to send any write request. ` +
-        "Grant the token's user permission to read /api/users/tokens/, or enable " +
-        "ALLOW_TOKEN_RETRIEVAL, so the suite can prove the token is read-only.",
+      `Token write capability is indeterminate: ${state.capability.detail}. ` +
+        `Refusing to send any write request.\n${INDETERMINATE_GUIDANCE}`,
     );
   }
   return `${state.capability.source}: ${state.capability.detail}`;

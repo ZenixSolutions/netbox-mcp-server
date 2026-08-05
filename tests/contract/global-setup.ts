@@ -22,6 +22,7 @@ import {
   probeTokenCapability,
   readPreflightState,
   SKIP_MESSAGE,
+  tokenFingerprint,
   writePreflightState,
 } from "./harness.js";
 import { asRecord, asString } from "./http.js";
@@ -106,6 +107,9 @@ export async function setup(): Promise<void> {
     netboxVersion,
     plugins,
     probedAt: new Date().toISOString(),
+    // State is keyed by base URL only. Bind it to the token as well so a
+    // determination made for one token can never be reused for another.
+    tokenFingerprint: tokenFingerprint(configured.token),
   });
 
   console.log(
