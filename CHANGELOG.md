@@ -10,6 +10,15 @@ surface may change in a minor release, with the change noted here.
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.1.0] - 2026-08-05
+
+First release. The repository existed before this — 446 tools, no tests, no CI,
+one squashed commit — and none of that was published. Everything below is the
+work of bringing it under Engineering OS governance (RFC-003) and replacing the
+tool surface.
+
 ### Added
 
 - Engineering OS governance: RFC-003, issue and pull request templates, a
@@ -200,4 +209,5 @@ surface may change in a minor release, with the change noted here.
   registration lives in the `REGISTRARS` table in `src/server.ts`. The 15 tool
   counts were verified against the built binary and are correct as published.
 
-[Unreleased]: https://github.com/ZenixSolutions/netbox-mcp-server/commits/main
+[Unreleased]: https://github.com/ZenixSolutions/netbox-mcp-server/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/ZenixSolutions/netbox-mcp-server/releases/tag/v0.1.0
