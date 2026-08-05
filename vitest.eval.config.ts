@@ -24,7 +24,11 @@ export default defineConfig({
     fileParallelism: false,
     isolate: false,
     pool: "forks",
-    poolOptions: { forks: { singleFork: true } },
+    // vitest 4 removed `poolOptions`; a single worker is now set at the top
+    // level. The intent is unchanged and load-bearing: these suites talk to
+    // one live NetBox instance, and running files concurrently would
+    // interleave requests and make the report's ordering meaningless.
+    maxWorkers: 1,
     sequence: { shuffle: false, concurrent: false },
     reporters: ["verbose"],
     // Without credentials every task is `describe.skip`, which vitest counts
