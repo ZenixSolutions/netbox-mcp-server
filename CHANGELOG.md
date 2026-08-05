@@ -31,6 +31,43 @@ surface may change in a minor release, with the change noted here.
   failing. Every run writes `docs/reference/spec-defects.md` and prints the same
   report to the console, including the checks that passed.
 
+- **The `netbox-modeling` skill, rewritten for the five-tool surface and moved
+  into this repository** (RFC-003, Open Question 3). It previously lived as an
+  account-level skill on one machine and drove the 446 tool names directly, so
+  it did not degrade when the surface changed — it broke completely, and nothing
+  in either artifact could have caught that, because the two were not versioned
+  together. It now lives in `skills/netbox-modeling/` and is reviewed with the
+  tools it calls.
+
+  The rewrite teaches the layer discipline (`netbox_discover` →
+  `netbox_describe` → `netbox_read`/`netbox_write`) and is explicit that three
+  calls before a write is the design: batch discovery, describe once per type
+  per task, resolve independent references together. It keeps the domain
+  knowledge the schema cannot supply — the conventional build order for a real
+  task, standard-practice defaults, and the playbooks for cabling, device
+  intake, IPAM and bulk creation — and carries the live findings that change how
+  a model should behave: take filter names from `netbox_describe` because NetBox
+  silently ignores the ones it does not recognise, send the `value` of a choice
+  field rather than the `{value, label}` object a GET returns, use `brief=true`
+  when scanning for ids, and never assume an object-type key exists. The
+  confirm-before-writing rule from the old skill is kept, and extended with the
+  delete guard: `confirm` must echo the object's current `display` value, and
+  the blast radius of a cascading delete is stated to the user before it runs.
+
+  Three claims the old skill made were wrong before the rewrite and are not
+  carried over: that `dcim.site` requires `status` (it defaults), that an
+  interface's `mac_address` can be written as a legacy string (it has been
+  read-only since 4.2 — a MAC is a `dcim.macaddress` object), and the long list
+  of objects the server "cannot manage", which was true of the old surface and
+  is now empty — tenants, regions, RIRs, module types, component templates,
+  patch-panel ports and tags are all ordinary object types.
+
+- `skills/README.md`, and `npm run build:skill`
+  (`scripts/build-skill.mjs`), which validates a skill's frontmatter and packs
+  the directory into a distributable `.skill` archive at
+  `dist/skills/<name>.skill`. Dependency-free: `node:zlib` plus a minimal zip
+  writer, rather than a dev dependency to produce one archive per release.
+
 ### Changed
 
 - **The tool surface is now five tools instead of 446** (issue #3, RFC-003 D1).
