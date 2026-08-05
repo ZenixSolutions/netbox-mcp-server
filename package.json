@@ -35,6 +35,7 @@
     "start": "node dist/index.js",
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
+    "build:skill": "node scripts/build-skill.mjs",
     "clean": "rm -rf dist coverage",
     "typecheck": "tsc --noEmit -p tsconfig.test.json",
     "lint": "eslint .",
@@ -44,6 +45,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:contract": "vitest run --config vitest.contract.config.ts",
+    "eval": "vitest run --config vitest.eval.config.ts",
     "check:changelog": "node scripts/check-changelog.mjs"
   },
   "engines": {

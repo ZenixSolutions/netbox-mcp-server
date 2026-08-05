@@ -257,6 +257,44 @@ The reason it is right here and was not right for Hudu is **A1 and the OpenAPI s
 
 The round-trip cost is real and should be measured, not assumed. The eval set in D7 is how we find out.
 
+### Amendment, 2026-08-05 — it was measured, and the table above was optimistic
+
+The eval set ran against a live NetBox 4.6.0. Full results in
+`docs/reference/eval-results.md`; the ten tasks were chosen to probe where this
+design is weakest, not where it looks good.
+
+**The "2–3 round-trips to first write" figure in the table is wrong.** Measured,
+calls before the first write are:
+
+| Task                                           | Calls before the write | Total |
+| ---------------------------------------------- | ---------------------: | ----: |
+| Create a site with guessed field names         |                      0 |     2 |
+| **Create a device with three prerequisites**   |                  **5** | **6** |
+| Assign an IP to an interface                   |                      2 |     3 |
+| Set a status the user named in their own words |                      0 |     2 |
+| Delete with confirmation                       |                      1 |     4 |
+
+A realistic create — the case the design exists to serve — costs **six calls**,
+not two or three. The table is corrected here rather than quietly left standing.
+
+What the run confirms in the design's favour: the self-healing claim holds.
+Two tasks reached a correct write in two calls by writing wrong first and
+recovering from the local rejection, which is cheaper than describing up front.
+A trivial read costs exactly one call. Nine of ten tasks completed within
+budget on the reference path.
+
+What it does not settle, and the report says so: whether a _model_ picks these
+paths. Three tasks need a human or an LLM judge, because the plausible wrong
+paths — four calls to look up one device, three calls and ten thousand
+characters of metadata to return one integer, or inventing a `netbox_changelog`
+tool rather than saying the surface cannot do it — are choices, not mechanics.
+
+The honest summary is that the context saving is enormous and certain
+(180,000 tokens to 3,000), and the round-trip cost is larger than claimed and
+concentrated in exactly the multi-prerequisite creates that real modelling work
+consists of. That is a trade worth making at this tool count, and it is not the
+free win the original table implied.
+
 ---
 
 ## Impact

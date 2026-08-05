@@ -4,3 +4,4 @@ node_modules/
 package-lock.json
 tests/fixtures/*.json
 docs/reference/spec-defects.md
+docs/reference/eval-results.md
