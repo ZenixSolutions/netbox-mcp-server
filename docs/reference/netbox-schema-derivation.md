@@ -76,6 +76,14 @@ viewsets, and `StatusView` is described as "A read-only endpoint at `/api/status
 ['rest_framework.permissions.AllowAny']`, and NetBox does not override it. That is consistent
 with the 200/403 split observed above.
 
+**[V — live 4.6.0]** A **bad** token is answered **403**, not 401, with
+`{"detail":"Invalid v2 token"}`, and a request with **no** `Authorization` header is answered
+403 with `{"detail":"Authentication credentials were not provided."}`. Both share a status
+with a genuine permission refusal, so **the status alone cannot be mapped to advice** — the
+`detail` string is the only thing that distinguishes "your token is wrong" from "your token
+may not do this", and a body matching neither must be reported as ambiguous rather than
+guessed at. See `src/errors.ts`.
+
 **Recommendation (design, not a finding): always send the API token when fetching the schema
 anyway.** The unauthenticated path works on stock NetBox but breaks under
 `EXEMPT_VIEW_PERMISSIONS`/reverse-proxy auth, and sending the token costs nothing. Do **not**
@@ -243,14 +251,29 @@ object_type = f"{app}.{model}"             # 'ipam.ipaddress'
 Singularisation rules needed, from the 82 real endpoint slugs present in the current
 hand-written server (`/home/claude/work/netbox-mcp-server/src/tools/*.ts`) [V — read from the repo]:
 
-| Slug                            | Naive `-s` strip         | Correct                                         |
-| ------------------------------- | ------------------------ | ----------------------------------------------- |
-| `ip-addresses`, `mac-addresses` | `ipaddresse`             | `ipaddress` (`-es` after `s`,`x`,`z`,`ch`,`sh`) |
-| `prefixes`                      | `prefixe`                | `prefix`                                        |
-| `vlan-translation-policies`     | `vlantranslationpolicie` | `vlantranslationpolicy` (`-ies` → `-y`)         |
-| `rirs`, `asns`, `vrfs`, `vlans` | ✓                        | ✓ (plain `-s`)                                  |
-| `console-server-ports`          | ✓                        | `consoleserverport`                             |
-| `device-bays`                   | ✓                        | `devicebay`                                     |
+| Slug                            | Naive `-s` strip         | Correct                                                   |
+| ------------------------------- | ------------------------ | --------------------------------------------------------- |
+| `ip-addresses`, `mac-addresses` | `ipaddresse`             | `ipaddress` (`-es` after `s`,`x`,`z`,`ch`,`sh`)           |
+| `purchases` (netbox-inventory)  | `purchase` ✓             | `purchase` — **but the `-es` rule above gets this WRONG** |
+| `prefixes`                      | `prefixe`                | `prefix`                                                  |
+| `vlan-translation-policies`     | `vlantranslationpolicie` | `vlantranslationpolicy` (`-ies` → `-y`)                   |
+| `rirs`, `asns`, `vrfs`, `vlans` | ✓                        | ✓ (plain `-s`)                                            |
+| `console-server-ports`          | ✓                        | `consoleserverport`                                       |
+| `device-bays`                   | ✓                        | `devicebay`                                               |
+
+**[V — live 4.6.0] `-ses` is ambiguous and "strip `-es` after a sibilant" is not sufficient.**
+`plugins/inventory/purchases` derived as `plugins.inventory.purchas`. The singular of a `-ses`
+plural ends in `-s` only when it is itself sibilant-final (`address`, `status`, `bus`);
+otherwise the plural was formed on a silent `-e` (`purchase`, `license`, `case`) and only the
+`-s` comes off. Test the CANDIDATE, not the plural: strip `-es`, and keep that result only if
+it ends in `ss`/`us`/`is`. `-xes`/`-zes`/`-ches`/`-shes` carry no such ambiguity.
+
+**Better still, do not derive the model from the slug when the schema already named it.** The
+request/response component resolved for the endpoint (`PurchaseRequest` → `Purchase`) is the
+serializer's own name for the model and is authoritative; the slug is a routing convenience.
+Use the component where it agrees with the slug modulo pluralisation, and fall back to the
+heuristic where it does not — which is exactly the set of endpoints named below, where the
+component is not the URL's noun. See `modelNameFor` in `src/schema/registry.ts`.
 
 **[V] This mapping is lossy for a handful of endpoints where the URL slug is not the model
 name.** Confirmed in 4.6.7: `/api/users/permissions/` resolves to read component
@@ -911,6 +934,20 @@ start status tag* tenant* updated_by_request vc_position vc_priority virtual_cha
 Point 5 is the one that makes the design work: **layer 2 must be queryable, not just
 dumpable.** A `describe` that always returns everything about `dcim.device` re-creates the
 context problem the 446-tool server has.
+
+**[V — live 4.6.0] The summary is not the valid set, and NetBox will not tell you.** An
+unrecognised query parameter is **ignored**: `?nb_mcp_contract_probe=1` returned HTTP 200 and
+the same `count` as the unfiltered collection. A model that misspells a filter therefore gets
+every object and no signal, which is worse than an error. Two consequences, both load-bearing:
+
+- The execution layer must reject filter names locally, because nothing downstream will.
+- It must **not** validate against the summarised list. `name__ic` is legitimate, is one of
+  the ~248 names step 4 elides, and is exactly what the grammar sentence tells models to
+  write. Validate against the full parameter list (or a known suffix on a known base).
+
+A known filter with a bad **value** needs no local rule: NetBox answers 400 naming the valid
+choices (`{"status":["Select a valid choice…"]}`, `{"id":["Enter a whole number."]}`). Only
+unknown **names** are silently dropped.
 
 ---
 

@@ -125,14 +125,70 @@ export function classifyPath(path: string, item: PathItemObject): ClassifiedPath
  * Singularise a URL slug into a model name. NetBox slugs are hyphenated
  * plurals; `-es` after a sibilant, `-ies`, and the already-singular
  * `virtual-chassis` are the cases a naive `-s` strip gets wrong (§2.3).
+ *
+ * `-ses` is the case that got the netbox-inventory plugin wrong on a live
+ * 4.6.0: stripping `-es` from every sibilant `-es` turns `purchases` into
+ * `purchas`. The singular of a `-ses` plural ends in `-s` only when it is
+ * itself sibilant-final (`address`, `status`, `bus`); otherwise the plural was
+ * formed on a silent `-e` (`purchase`, `license`, `case`) and only the `-s`
+ * comes off. Testing the candidate rather than the plural is what separates
+ * them. `-ches`/`-shes`/`-xes`/`-zes` carry no such ambiguity in the slugs
+ * NetBox serves and come off whole.
+ *
+ * This is a heuristic over a URL slug, which is not authoritative — prefer
+ * `modelNameFor`, which uses it only as a fallback.
  */
 export function singularise(slug: string): string {
   const flat = slug.replace(/-/g, "");
   if (/(?:ss|us|is)$/.test(flat)) return flat;
   if (/ies$/.test(flat)) return `${flat.slice(0, -3)}y`;
-  if (/(?:s|x|z|ch|sh)es$/.test(flat)) return flat.slice(0, -2);
+  if (/(?:x|z|ch|sh)es$/.test(flat)) return flat.slice(0, -2);
+  if (/ses$/.test(flat)) {
+    const withoutEs = flat.slice(0, -2);
+    return /(?:ss|us|is)$/.test(withoutEs) ? withoutEs : flat.slice(0, -1);
+  }
   if (/s$/.test(flat)) return flat.slice(0, -1);
   return flat;
+}
+
+/**
+ * True when `model` could have produced `flatSlug` by pluralisation.
+ *
+ * The guard on trusting a component name: `dcim/devices` resolves the read
+ * component `DeviceWithConfigContext` and `users/permissions` resolves
+ * `ObjectPermission`, neither of which is the URL's noun. Requiring the
+ * component to be the slug modulo a plural suffix accepts `Purchase` for
+ * `purchases` and rejects both of those, which then fall back to the slug.
+ */
+function pluraliseAgrees(model: string, flatSlug: string): boolean {
+  if (model.length === 0) return false;
+  if (flatSlug === model || flatSlug === `${model}s` || flatSlug === `${model}es`) {
+    return true;
+  }
+  return model.endsWith("y") && flatSlug === `${model.slice(0, -1)}ies`;
+}
+
+/**
+ * The model name for a collection, preferring the component the schema itself
+ * resolved over the URL slug.
+ *
+ * A slug is a routing convenience; the request/response component is the
+ * serializer's own name for the model, and it is what the singularisation
+ * heuristic is trying to guess. Where the two agree modulo pluralisation the
+ * component wins — that is how `plugins/inventory/purchases` becomes
+ * `purchase` no matter what any `-es` rule does.
+ */
+export function modelNameFor(
+  slug: string,
+  componentNames: (string | undefined)[] = [],
+): string {
+  const flat = slug.replace(/-/g, "").toLowerCase();
+  for (const componentName of componentNames) {
+    if (componentName === undefined) continue;
+    const model = stripWriteAffixes(componentName).toLowerCase();
+    if (pluraliseAgrees(model, flat)) return model;
+  }
+  return singularise(slug);
 }
 
 /**
@@ -156,9 +212,19 @@ function labelFor(collectionGet: OperationObject | undefined, model: string): st
   return raw.charAt(0).toUpperCase() + raw.slice(1);
 }
 
-/** `dcim` + `ip-addresses` -> `ipam.ipaddress`; plugins get three segments. */
-export function objectTypeKey(app: string, slug: string): ObjectTypeKey {
-  return `${app.replace(/\//g, ".")}.${singularise(slug)}`;
+/**
+ * `dcim` + `ip-addresses` -> `ipam.ipaddress`; plugins get three segments.
+ *
+ * `model` is the derivation's own key component: this is a stable identifier
+ * for this server, deliberately NOT a claim about Django's `app_label.model`
+ * (§2.3).
+ */
+export function objectTypeKey(
+  app: string,
+  slug: string,
+  model: string = singularise(slug),
+): ObjectTypeKey {
+  return `${app.replace(/\//g, ".")}.${model}`;
 }
 
 function deriveOperations(
@@ -278,13 +344,15 @@ export function buildRegistry(document: OpenApiDocument): SchemaRegistry {
       continue;
     }
 
-    const key = objectTypeKey(collection.app, collection.slug);
-    const model = singularise(collection.slug);
-    const endpoint = `${collection.app}/${collection.slug}`;
-    const label = labelFor(collection.item.get, model);
     const write = resolveWriteSchema(collection.item, detail.item);
     const patchSchemaName = requestSchemaName(detail.item.patch);
     const readSchemaName = responseSchemaName(detail.item.get);
+    // The resolved components are authoritative where they agree with the
+    // slug; the slug heuristic is the fallback, not the first choice.
+    const model = modelNameFor(collection.slug, [write.name, readSchemaName]);
+    const key = objectTypeKey(collection.app, collection.slug, model);
+    const endpoint = `${collection.app}/${collection.slug}`;
+    const label = labelFor(collection.item.get, model);
 
     const summary: ObjectTypeSummary = {
       object_type: key,

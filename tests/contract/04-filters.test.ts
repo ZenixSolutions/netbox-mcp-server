@@ -9,12 +9,14 @@
  *     suffixes. If the surviving names do not work, that sentence is a lie.
  *
  * (b) What does NetBox do with a query parameter it does not recognise?
- *     `src/tools/layered/read.ts` passes `filters` through after nothing but a
- *     `/^[a-zA-Z][a-zA-Z0-9_]*$/` name check. If NetBox ignores unknown
- *     parameters, a model's typo silently returns the UNFILTERED collection and
- *     the model believes it filtered — the worst outcome available. If NetBox
- *     400s, the model gets told and can fix it. Which one happens decides
- *     whether read.ts needs to validate filter names against describe's list.
+ *     ANSWERED, on 4.6.0: it ignores it, answers 200, and returns the
+ *     UNFILTERED collection. A model's typo silently returns every object and
+ *     the model believes it filtered — the worst outcome available, and NetBox
+ *     gives no signal at all. `src/tools/layered/read.ts` therefore validates
+ *     filter names against the derived parameter set before sending anything.
+ *     This file re-establishes the premise on each run: if an instance ever
+ *     turns out to be STRICT, the local rejection is redundant rather than
+ *     wrong, but the premise should stop being asserted.
  */
 
 import { beforeAll, it } from "vitest";
@@ -159,19 +161,50 @@ describeContract(SECTION, () => {
       section: SECTION,
       check: "unknown query parameter",
       derived:
-        "unknown — read.ts forwards any syntactically valid filter name and only appends a " +
-        "hint if NetBox complains",
+        "ignored, HTTP 200, unfiltered collection — the premise for read.ts rejecting unknown " +
+        "filter names locally",
       actual:
         bogus.status === 200
           ? `HTTP 200, count=${bogusCount ?? "absent"} vs unfiltered ${total} — NetBox ${ignored ? "IGNORED it" : "changed the result set"}`
           : `HTTP ${bogus.status}: ${preview(parseJson(bogus.body), 160)}`,
       verdict: "info",
       note: ignored
-        ? "NetBox is TOLERANT. A model that misspells a filter gets the full unfiltered " +
-          "collection and no indication that its filter was dropped. read.ts should reject " +
-          "filter names that are not in the describe list, because NetBox will not."
-        : "NetBox is STRICT about unknown parameters. read.ts's pass-through is acceptable: " +
-          "a typo surfaces as an error the model can act on.",
+        ? "NetBox is TOLERANT, as assumed. A model that misspells a filter gets the full " +
+          "unfiltered collection and no indication that its filter was dropped, so read.ts " +
+          "rejects unknown names itself."
+        : "NetBox is STRICT about unknown parameters on this instance. read.ts's local " +
+          "rejection is then redundant, not wrong — but stop asserting the tolerant premise.",
+    });
+
+    // The set read.ts validates against, on this instance's real schema: the
+    // probe name must be absent from it and the real filters present, or the
+    // rejection would either miss typos or refuse legitimate calls.
+    const derivedNames = new Set(
+      describeObjectType(registry, entry, "list").filterNames ?? [],
+    );
+    const advertisedNames = (
+      describeObjectType(registry, entry, "list").filters ?? []
+    ).map((filter) => filter.name);
+    observations.push({
+      section: SECTION,
+      check: "the derived parameter set can catch what NetBox will not",
+      derived:
+        "every advertised filter is in the validated set, the `__` variants are too, and a " +
+        "bogus name is not",
+      actual:
+        `${derivedNames.size} name(s) validated against; ` +
+        `bogus name present: ${String(derivedNames.has("nb_mcp_contract_probe"))}; ` +
+        `advertised names missing: ${advertisedNames.filter((name) => !derivedNames.has(name)).join(", ") || "none"}; ` +
+        `lookup variants included: ${String([...derivedNames].some((name) => name.includes("__")))}`,
+      verdict:
+        !derivedNames.has("nb_mcp_contract_probe") &&
+        advertisedNames.every((name) => derivedNames.has(name))
+          ? "match"
+          : "mismatch",
+      note:
+        "netbox_describe SUMMARISES filters; validating against the summary would reject " +
+        "`name__ic`, which filterGrammar tells models to use. The validated set is the full " +
+        "parameter list.",
     });
 
     // A known filter with a value of the wrong type.

@@ -89,6 +89,24 @@ describe("fetching", () => {
     expect(loaded.source).toBe("network");
   });
 
+  /**
+   * A live 4.6.0 transferred the schema UNCOMPRESSED: 12,431,579 bytes in
+   * 7,451 ms, `Content-Encoding` absent, on a request that did ask for gzip.
+   * The instance's front end is not compressing the vendor content type, which
+   * this end cannot fix — but dropping the request header would turn a
+   * server-side misconfiguration into a permanent one, so it is pinned here.
+   */
+  it("asks for a compressed schema: 12 MB is not a reasonable first tool call", async () => {
+    const { httpGet, calls } = makeHttpGet({
+      "/status/": ok({ "netbox-version": "4.6.7" }),
+      "/schema/": ok(document),
+    });
+    await createSchemaLoader({ config, httpGet, cacheDir, warn: () => {} }).load();
+
+    const schemaCall = calls.find((call) => call.url.includes("/schema/"));
+    expect(schemaCall?.headers["Accept-Encoding"]).toContain("gzip");
+  });
+
   it("parses the body whatever the content type claims", async () => {
     // drf-spectacular serves `application/vnd.oai.openapi+json`; a client that
     // gates on `application/json` gets binary garbage instead of a document.
@@ -123,6 +141,10 @@ describe("fetching", () => {
 });
 
 describe("cache key", () => {
+  // What this buys, measured on a live 4.6.0: 12.43 MB and 7,451 ms, paid on
+  // the first tool call of the first process per NetBox+plugin version, and
+  // never again until one of those versions changes. The test below is the
+  // guarantee that "never again" holds.
   it("keys on the NetBox version and skips the fetch on the next process", async () => {
     const first = makeHttpGet({
       "/status/": ok({

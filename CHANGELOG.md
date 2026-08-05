@@ -86,6 +86,70 @@ surface may change in a minor release, with the change noted here.
 
 ### Fixed
 
+- **Four defects found by running the contract suite against a real NetBox
+  4.6.0.** Each was a rule that had been verified against a captured 4.6.7
+  schema document and never against a live instance answering requests.
+
+  - **A misspelled filter no longer returns the whole collection.** The
+    derivation assumed a wrong query parameter would be rejected. NetBox
+    ignores it: `?nb_mcp_contract_probe=1` came back HTTP 200 with the same
+    `count` as the unfiltered collection, and nothing in the response said the
+    filter had been dropped. `netbox_read` forwarded any syntactically valid
+    name, so an agent asking for "the devices at site X" with a typo received
+    **every device**, believed it had filtered, and would then act on that
+    list. Filter names are now checked against the parameter set derived for
+    that object type and an unknown one is refused before the request is sent,
+    with near-misses named. The check is against the FULL derived set, not the
+    list `netbox_describe` shows: that list is summarised — 120 of 158 names
+    are elided for `dcim.site` — and `name__ic` is both legitimate and absent
+    from it.
+
+  - **An invalid token is no longer reported as a permissions problem.** The
+    error mapping assumed 401 for a bad credential, on DRF's documented
+    behaviour. The instance answered **403**, with a `detail` of
+    "Invalid v2 token", which fell into the 403 branch and told the operator
+    "the API token lacks permission for this object or action" — sending
+    someone whose token is simply wrong to audit object permissions. 403 is now
+    read from the body rather than the status: an invalid or expired credential
+    names `NETBOX_TOKEN`, a permission refusal names the token's permissions
+    and `write_enabled`, and a body matching neither says both are possible
+    rather than guessing. The unauthenticated case — 403 with a `detail` of
+    "Authentication credentials were not provided.", which is what a proxy
+    stripping the header looks like, and which presents as neither a network
+    error nor an obvious auth error — is now named explicitly.
+
+  - **An upstream error page can no longer reach the model.** A 404 on an
+    unknown endpoint answered `text/html`, and the body extractor returned a
+    plain-string body verbatim — a whole error page, however large. Bodies are
+    now collapsed to one line and truncated, and an HTML body is described
+    rather than relayed.
+
+  - **`plugins/inventory/purchases` derived as `plugins.inventory.purchas`.**
+    The singularisation rule strips `-es` after any sibilant, which is right
+    for `addresses` and wrong for `purchases`. The endpoint sweep passed
+    because the endpoint is stored rather than reconstructed — but the key is
+    what a model passes to `netbox_read`, and no user or model would guess the
+    misspelling. `-ses` is now resolved by testing the candidate (`address`
+    keeps its `-es` strip; `purchase` does not), and, ahead of the heuristic,
+    the key is taken from the component the schema itself resolved
+    (`PurchaseRequest` → `Purchase`) wherever that agrees with the slug modulo
+    pluralisation. The slug is a routing convenience; the component is the
+    serializer's own name for the model. No core object-type key changes:
+    `users/permissions` stays `users.permission` and `dcim/devices` stays
+    `dcim.device`, because `ObjectPermission` and `DeviceWithConfigContext` are
+    not the URL's noun and are not trusted.
+
+  The same run measured the schema fetch at **12.43 MB in 7,451 ms with no
+  `Content-Encoding`** — transferred uncompressed. That one is not a defect on
+  this side and nothing was changed for it: the loader already sends
+  `Accept-Encoding: gzip, deflate` (the contract suite asked for compression
+  too and was not given it), and the on-disk cache means the fetch is paid once
+  per NetBox-plus-plugin version rather than once per process. The instance's
+  front end is not compressing `application/vnd.oai.openapi+json`, which is
+  worth fixing where it is served. Both the request header and the cache's
+  "once per version" guarantee are now pinned by tests, because losing either
+  quietly would make a 12 MB first tool call the normal case.
+
 - Source maps are no longer published, cutting the installed size of every
   `npx` run.
 - Documentation corrections (issue #13). Node.js was stated as `>= 18` in

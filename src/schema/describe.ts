@@ -278,13 +278,15 @@ function filterDescription(param: ParameterObject): string | undefined {
 export function summariseFilters(
   operation: OperationObject | undefined,
   rank: { requiredFields: string[] },
-): { filters: FilterSpec[]; elided: number } {
+): { filters: FilterSpec[]; elided: number; all: string[] } {
   const parameters = (operation?.parameters ?? []).filter(
     (param) => param.in === "query" && typeof param.name === "string",
   );
   const base: ParameterObject[] = [];
+  const all: string[] = [];
   let elided = 0;
   for (const param of parameters) {
+    if (param.name !== undefined) all.push(param.name);
     if (param.name !== undefined && param.name.includes("__")) {
       elided += 1;
       continue;
@@ -318,7 +320,7 @@ export function summariseFilters(
         : { name, type: filterType(param.schema), description };
     });
 
-  return { filters, elided };
+  return { filters, elided, all };
 }
 
 function choiceFieldNote(fields: FieldSpec[]): string | undefined {
@@ -405,7 +407,7 @@ export function describeObjectType(
 
   if (operation === "list") {
     const writeSchema = writeSchemaOf(registry, entry);
-    const { filters, elided } = summariseFilters(entry.collection.get, {
+    const { filters, elided, all } = summariseFilters(entry.collection.get, {
       requiredFields: writeSchema?.required ?? [],
     });
     const notes = [
@@ -418,6 +420,9 @@ export function describeObjectType(
     return {
       ...base,
       filters,
+      // The elided names still have to reach the validator: `filters` is what
+      // a model is shown, `filterNames` is what a call is checked against.
+      filterNames: all,
       filterGrammar: FILTER_GRAMMAR,
       notes,
     };
