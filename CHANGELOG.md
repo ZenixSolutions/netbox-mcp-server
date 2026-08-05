@@ -20,6 +20,16 @@ surface may change in a minor release, with the change noted here.
   the `tools/list` response.
 - `--version`, `--check` and `--list-tools` command-line verbs, so a published
   package can be verified without a NetBox instance.
+- Live contract suite in `tests/contract/`, run with `npm run test:contract`
+  (issue #4). It compares what the server derives from an instance's own
+  `/api/schema/` against what that instance actually does: schema acquisition,
+  every derived endpoint, the pagination envelope, declared fields versus real
+  objects, enum values, filter behaviour including unknown query parameters, the
+  real status codes behind the error mapping, and the refusal of a create and a
+  delete under a read-only token. It is opt-in — `npm test` never runs it, and
+  without `NETBOX_URL`/`NETBOX_TOKEN` it skips with an explanation instead of
+  failing. Every run writes `docs/reference/spec-defects.md` and prints the same
+  report to the console, including the checks that passed.
 
 ### Changed
 

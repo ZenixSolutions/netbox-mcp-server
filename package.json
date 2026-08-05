@@ -43,6 +43,7 @@
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:contract": "vitest run --config vitest.contract.config.ts",
     "check:changelog": "node scripts/check-changelog.mjs"
   },
   "engines": {
