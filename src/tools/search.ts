@@ -12,7 +12,7 @@ import { z } from "zod";
 
 import { getClient, PaginatedResponse } from "../client.js";
 import { handleApiError } from "../errors.js";
-import { displayRef, ResponseFormat } from "../formatting.js";
+import { displayRef, ResponseFormat, toDisplayString } from "../formatting.js";
 import { ResponseFormatField } from "../schemas/common.js";
 
 const SEARCH_TARGETS: { endpoint: string; label: string }[] = [
@@ -33,7 +33,9 @@ const Input = z
       .string()
       .min(1)
       .max(200)
-      .describe("Text to search for (passed as NetBox's `q` parameter on every resource)."),
+      .describe(
+        "Text to search for (passed as NetBox's `q` parameter on every resource).",
+      ),
     limit_per_resource: z
       .number()
       .int()
@@ -99,17 +101,20 @@ Returns:
     async (params: InputType) => {
       try {
         const client = getClient();
-        const targets = params.resources
-          ? SEARCH_TARGETS.filter((t) => params.resources!.includes(t.label as any))
+        const selected: readonly string[] | undefined = params.resources;
+        const targets = selected
+          ? SEARCH_TARGETS.filter((t) => selected.includes(t.label))
           : SEARCH_TARGETS;
 
         const settled = await Promise.allSettled(
           targets.map(async (t) => {
-            const data: PaginatedResponse<Record<string, unknown>> =
-              await client.list(t.endpoint, {
+            const data: PaginatedResponse<Record<string, unknown>> = await client.list(
+              t.endpoint,
+              {
                 q: params.query,
                 limit: params.limit_per_resource,
-              });
+              },
+            );
             const section: SectionResult = {
               label: t.label,
               total: data.count,
@@ -122,7 +127,7 @@ Returns:
         const sections: SectionResult[] = settled.map((r, i) => {
           if (r.status === "fulfilled") return r.value;
           return {
-            label: targets[i].label,
+            label: targets[i]?.label ?? "unknown",
             total: 0,
             items: [],
             error: handleApiError(r.reason),
@@ -159,26 +164,25 @@ Returns:
             lines.push("_(no hits)_");
           } else {
             for (const item of section.items) {
-              const display =
+              const display = toDisplayString(
                 item.display ??
-                item.name ??
-                displayRef(item) ??
-                item.address ??
-                item.prefix ??
-                item.vid ??
-                `#${item.id}`;
+                  item.name ??
+                  displayRef(item) ??
+                  item.address ??
+                  item.prefix ??
+                  item.vid ??
+                  `#${toDisplayString(item.id)}`,
+              );
               const extras: string[] = [];
               const parent =
-                displayRef(item.device) ??
-                displayRef(item.site) ??
-                displayRef(item.vrf);
+                displayRef(item.device) ?? displayRef(item.site) ?? displayRef(item.vrf);
               if (parent) extras.push(`on ${parent}`);
               if (item.status && typeof item.status === "object") {
                 const statusLabel = displayRef(item.status);
                 if (statusLabel) extras.push(`status=${statusLabel}`);
               }
               lines.push(
-                `- **${display}** (id=${item.id})${
+                `- **${display}** (id=${toDisplayString(item.id)})${
                   extras.length ? " — " + extras.join(", ") : ""
                 }`,
               );

@@ -1,0 +1,33 @@
+version: 2
+
+# Grouping is not cosmetic. vitest and @vitest/coverage-v8 must move together
+# or `npm ci` fails on a peer conflict with whichever half has not moved yet —
+# which reads as a broken upgrade rather than an incomplete one. Same for the
+# eslint/typescript-eslint family. `update-types` is deliberately unset so
+# majors move as a set too.
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      vitest:
+        patterns:
+          - "vitest"
+          - "@vitest/*"
+      eslint:
+        patterns:
+          - "eslint"
+          - "@eslint/*"
+          - "typescript-eslint"
+          - "eslint-config-*"
+      typescript:
+        patterns:
+          - "typescript"
+          - "@types/node"
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

@@ -35,15 +35,15 @@ It is not a hosted service, there is no login page, and nothing is deployed anyw
 
 Facts you may need:
 
-| Property | Value |
-|---|---|
-| Language / runtime | TypeScript compiled to ESM JavaScript, Node.js **>= 18** |
-| Package manager | npm |
-| Transport | stdio only |
-| Entry point after build | `dist/index.js` |
-| Required env vars | `NETBOX_URL`, `NETBOX_TOKEN` |
-| Optional env vars | `NETBOX_INSECURE`, `NETBOX_READONLY`, `NETBOX_TOOL_GROUPS` |
-| Total tools registered by default | **446** |
+| Property                          | Value                                                      |
+| --------------------------------- | ---------------------------------------------------------- |
+| Language / runtime                | TypeScript compiled to ESM JavaScript, Node.js **>= 18**   |
+| Package manager                   | npm                                                        |
+| Transport                         | stdio only                                                 |
+| Entry point after build           | `dist/index.js`                                            |
+| Required env vars                 | `NETBOX_URL`, `NETBOX_TOKEN`                               |
+| Optional env vars                 | `NETBOX_INSECURE`, `NETBOX_READONLY`, `NETBOX_TOOL_GROUPS` |
+| Total tools registered by default | **446**                                                    |
 
 ---
 
@@ -61,7 +61,7 @@ Facts you may need:
    performs the dependency checks, build, and smoke test from sections 3, 5 and 7.1 in
    one deterministic pass, and prints a client config with the correct absolute paths
    already filled in. Run it instead of hand-rolling those commands. Section 3 is what
-   you do *before* the clone, and the reference for interpreting any check it fails.
+   you do _before_ the clone, and the reference for interpreting any check it fails.
 5. **Do not modify `src/`.** You are installing, not developing.
 6. **Check each command's exit code.** If a command fails, stop and consult section 8
    (Troubleshooting) rather than continuing to the next step.
@@ -74,11 +74,11 @@ Facts you may need:
 
 Before running anything, confirm you have all three. Ask for any that are missing.
 
-| Item | Looks like | Where it comes from |
-|---|---|---|
-| NetBox base URL | `https://netbox.yourcompany.com` | The company's NetBox instance. **No `/api` suffix** — the server appends it. |
-| NetBox API token | 40 hex characters | NetBox web UI → user menu → **API Tokens** → **Add a token** |
-| Which AI client | Claude Desktop / ChatGPT desktop / Codex CLI / Cursor | Ask the user |
+| Item             | Looks like                                            | Where it comes from                                                          |
+| ---------------- | ----------------------------------------------------- | ---------------------------------------------------------------------------- |
+| NetBox base URL  | `https://netbox.yourcompany.com`                      | The company's NetBox instance. **No `/api` suffix** — the server appends it. |
+| NetBox API token | 40 hex characters                                     | NetBox web UI → user menu → **API Tokens** → **Add a token**                 |
+| Which AI client  | Claude Desktop / ChatGPT desktop / Codex CLI / Cursor | Ask the user                                                                 |
 
 **Token permissions.** Tell the user to create the token with the narrowest permissions
 that fit their job:
@@ -115,8 +115,8 @@ xcode-select -p
 
 - **Expected:** a path such as `/Library/Developer/CommandLineTools`.
 - **If it errors:** run `xcode-select --install`. This opens a **GUI dialog**. You
-  cannot click it. Tell the user: *"A macOS dialog just opened — click Install, accept
-  the license, and tell me when it finishes (it takes a few minutes)."* Then wait for
+  cannot click it. Tell the user: _"A macOS dialog just opened — click Install, accept
+  the license, and tell me when it finishes (it takes a few minutes)."_ Then wait for
   the user before continuing. Do not poll in a loop.
 
 ### 3.3 Homebrew
@@ -191,7 +191,7 @@ curl -sS -o /dev/null -w '%{http_code}\n' --max-time 10 "$NETBOX_URL/api/status/
 Do **not** export `NETBOX_TOKEN` the same way — see the note in section 7.1.
 
 - **Expected:** `403` or `401` (the API is reachable but you sent no token) — that is a
-  *success* for this check.
+  _success_ for this check.
 - **`200`:** also fine.
 - **`000` / timeout:** DNS or network failure. The NetBox instance is probably internal —
   ask the user whether they need to be on the corporate VPN.
@@ -297,7 +297,7 @@ For any other client, or if the script is unavailable, edit by hand as below.
   templates below verbatim over an existing file — you would silently delete every other
   server they have.
 - **Back it up first**, then validate before you consider the step done. A malformed
-  config makes the client drop *all* MCP servers, not just this one, which is a
+  config makes the client drop _all_ MCP servers, not just this one, which is a
   maddening failure to debug.
 
 ```bash
@@ -491,20 +491,20 @@ first 5 sites."** A correct install returns real site names from the company's N
 
 ## 8. Troubleshooting
 
-| Symptom | Cause | Fix |
-|---|---|---|
-| Client shows no netbox tools at all | Client not restarted | Fully quit (Cmd-Q) and reopen |
-| Client shows no netbox tools; other MCP servers also vanished | Malformed JSON in the config | Validate with `python3 -m json.tool` |
-| `spawn node ENOENT` in client logs | GUI app can't find a version-manager `node` | Use the absolute path from `which node` in the config — see 3.4 |
-| `Cannot find module '.../dist/index.js'` | Not built, or wrong path in config | `npm run build`; confirm path with `pwd` |
-| `Missing required environment variable NETBOX_URL` | Env block absent or misspelled in config | Check the `env` object; names are case-sensitive |
-| `{"detail":"Invalid token."}` | Wrong/expired/revoked token | Create a new one in NetBox |
-| `403 Forbidden` on a create/update | Token is read-only, or the NetBox user lacks object permissions | Expected if intentional; otherwise widen permissions in NetBox |
-| `ETIMEDOUT` / `ENOTFOUND` | NetBox is internal-only | Connect to the corporate VPN |
-| `unable to verify the first certificate` / `SELF_SIGNED_CERT_IN_CHAIN` | Internal CA | Install the corporate root CA (best), or set `NETBOX_INSECURE=1` (weakens security) |
-| Client is slow, or ignores/misuses the tools | 446 tools is a lot of context for one client | Narrow with `NETBOX_TOOL_GROUPS` — see section 10 |
-| `git clone` fails behind a proxy | Corporate proxy intercepting TLS | Set `git config --global http.proxy <url>`, or download the ZIP from the repo's Code button |
-| `npm ci` fails with `EACCES` | A previous `sudo npm` left root-owned files in the npm cache | **Stop and hand this to the user** — it needs root, which you must not use. Tell them to run `sudo chown -R "$(whoami)" ~/.npm` in their own Terminal, then say when it is done |
+| Symptom                                                                | Cause                                                           | Fix                                                                                                                                                                             |
+| ---------------------------------------------------------------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Client shows no netbox tools at all                                    | Client not restarted                                            | Fully quit (Cmd-Q) and reopen                                                                                                                                                   |
+| Client shows no netbox tools; other MCP servers also vanished          | Malformed JSON in the config                                    | Validate with `python3 -m json.tool`                                                                                                                                            |
+| `spawn node ENOENT` in client logs                                     | GUI app can't find a version-manager `node`                     | Use the absolute path from `which node` in the config — see 3.4                                                                                                                 |
+| `Cannot find module '.../dist/index.js'`                               | Not built, or wrong path in config                              | `npm run build`; confirm path with `pwd`                                                                                                                                        |
+| `Missing required environment variable NETBOX_URL`                     | Env block absent or misspelled in config                        | Check the `env` object; names are case-sensitive                                                                                                                                |
+| `{"detail":"Invalid token."}`                                          | Wrong/expired/revoked token                                     | Create a new one in NetBox                                                                                                                                                      |
+| `403 Forbidden` on a create/update                                     | Token is read-only, or the NetBox user lacks object permissions | Expected if intentional; otherwise widen permissions in NetBox                                                                                                                  |
+| `ETIMEDOUT` / `ENOTFOUND`                                              | NetBox is internal-only                                         | Connect to the corporate VPN                                                                                                                                                    |
+| `unable to verify the first certificate` / `SELF_SIGNED_CERT_IN_CHAIN` | Internal CA                                                     | Install the corporate root CA (best), or set `NETBOX_INSECURE=1` (weakens security)                                                                                             |
+| Client is slow, or ignores/misuses the tools                           | 446 tools is a lot of context for one client                    | Narrow with `NETBOX_TOOL_GROUPS` — see section 10                                                                                                                               |
+| `git clone` fails behind a proxy                                       | Corporate proxy intercepting TLS                                | Set `git config --global http.proxy <url>`, or download the ZIP from the repo's Code button                                                                                     |
+| `npm ci` fails with `EACCES`                                           | A previous `sudo npm` left root-owned files in the npm cache    | **Stop and hand this to the user** — it needs root, which you must not use. Tell them to run `sudo chown -R "$(whoami)" ~/.npm` in their own Terminal, then say when it is done |
 
 **Reading client logs.** Claude Desktop writes per-server logs to
 `~/Library/Logs/Claude/mcp-server-netbox.log`. Read that file first when a server fails
@@ -529,31 +529,31 @@ Everything from section 4 onward is identical apart from paths.
 
 ## 10. Environment variable reference
 
-| Variable | Required | Default | Meaning |
-|---|---|---|---|
-| `NETBOX_URL` | **yes** | — | Base URL, no `/api` suffix. A trailing `/api` or `/` is stripped automatically. |
-| `NETBOX_TOKEN` | **yes** | — | NetBox API token. |
-| `NETBOX_INSECURE` | no | off | `1`/`true`/`yes` disables TLS certificate verification. Internal CAs only. |
-| `NETBOX_READONLY` | no | off | `1`/`true`/`yes` registers only `list`/`get`/`search` tools. Create, update, and delete tools are **not registered at all**, so the model cannot call them. |
-| `NETBOX_TOOL_GROUPS` | no | all | Comma-separated allowlist of tool groups. Unknown names are ignored with a warning. |
+| Variable             | Required | Default | Meaning                                                                                                                                                     |
+| -------------------- | -------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `NETBOX_URL`         | **yes**  | —       | Base URL, no `/api` suffix. A trailing `/api` or `/` is stripped automatically.                                                                             |
+| `NETBOX_TOKEN`       | **yes**  | —       | NetBox API token.                                                                                                                                           |
+| `NETBOX_INSECURE`    | no       | off     | `1`/`true`/`yes` disables TLS certificate verification. Internal CAs only.                                                                                  |
+| `NETBOX_READONLY`    | no       | off     | `1`/`true`/`yes` registers only `list`/`get`/`search` tools. Create, update, and delete tools are **not registered at all**, so the model cannot call them. |
+| `NETBOX_TOOL_GROUPS` | no       | all     | Comma-separated allowlist of tool groups. Unknown names are ignored with a warning.                                                                         |
 
 ### Tool groups and their sizes
 
-| Group | Tools | Covers |
-|---|---:|---|
-| `search` | 1 | `netbox_global_search` — fuzzy lookup across every resource |
-| `dcim` | 40 | sites, locations, racks, manufacturers, device types, device roles, platforms, devices, interfaces, cables |
-| `dcim_org` | 20 | regions, site groups, rack roles, rack types, rack reservations |
-| `dcim_components` | 76 | modules, bays, console/front/rear ports, MAC addresses, inventory items, and their templates |
-| `ipam` | 32 | prefixes, IP addresses, VLANs, VLAN groups, VRFs, aggregates, IP ranges, roles |
-| `ipam_org` | 16 | RIRs, ASNs, ASN ranges, route targets |
-| `ipam_services` | 24 | services, service templates, FHRP groups, VLAN translation |
-| `inventory` | 28 | netbox-inventory plugin: assets, suppliers, purchases, deliveries |
-| `power` | 24 | power panels, feeds, ports, outlets, and templates |
-| `tenancy` | 24 | tenants, tenant groups, contacts, contact roles/groups/assignments |
-| `virtualization` | 28 | clusters, VMs, VM interfaces, virtual disks |
-| `circuits` | 44 | providers, circuits, terminations, virtual circuits |
-| `deletes` | 89 | `netbox_delete_*` for every resource — **destructive, cascading** |
+| Group             | Tools | Covers                                                                                                     |
+| ----------------- | ----: | ---------------------------------------------------------------------------------------------------------- |
+| `search`          |     1 | `netbox_global_search` — fuzzy lookup across every resource                                                |
+| `dcim`            |    40 | sites, locations, racks, manufacturers, device types, device roles, platforms, devices, interfaces, cables |
+| `dcim_org`        |    20 | regions, site groups, rack roles, rack types, rack reservations                                            |
+| `dcim_components` |    76 | modules, bays, console/front/rear ports, MAC addresses, inventory items, and their templates               |
+| `ipam`            |    32 | prefixes, IP addresses, VLANs, VLAN groups, VRFs, aggregates, IP ranges, roles                             |
+| `ipam_org`        |    16 | RIRs, ASNs, ASN ranges, route targets                                                                      |
+| `ipam_services`   |    24 | services, service templates, FHRP groups, VLAN translation                                                 |
+| `inventory`       |    28 | netbox-inventory plugin: assets, suppliers, purchases, deliveries                                          |
+| `power`           |    24 | power panels, feeds, ports, outlets, and templates                                                         |
+| `tenancy`         |    24 | tenants, tenant groups, contacts, contact roles/groups/assignments                                         |
+| `virtualization`  |    28 | clusters, VMs, VM interfaces, virtual disks                                                                |
+| `circuits`        |    44 | providers, circuits, terminations, virtual circuits                                                        |
+| `deletes`         |    89 | `netbox_delete_*` for every resource — **destructive, cascading**                                          |
 
 `NETBOX_TOOL_GROUPS` is an explicit allowlist: anything you do not name is omitted,
 including `deletes`. Setting it to `search,dcim,ipam` yields 73 tools with no ability to

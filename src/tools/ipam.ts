@@ -47,13 +47,26 @@ const prefixFilters = {
     .string()
     .optional()
     .describe("Return prefixes that contain this CIDR or IP."),
-  family: z.union([z.literal(4), z.literal(6)]).optional().describe("4 or 6."),
+  family: z
+    .union([z.literal(4), z.literal(6)])
+    .optional()
+    .describe("4 or 6."),
   status: z.enum(PREFIX_STATUS).optional(),
   role_id: z.number().int().optional(),
   site_id: z.number().int().optional(),
-  vrf_id: z.number().int().optional().describe("Numeric VRF id; 'null' also matches global."),
+  vrf_id: z
+    .number()
+    .int()
+    .optional()
+    .describe("Numeric VRF id; 'null' also matches global."),
   tenant_id: z.number().int().optional(),
-  mask_length: z.number().int().min(0).max(128).optional().describe("Exact prefix length."),
+  mask_length: z
+    .number()
+    .int()
+    .min(0)
+    .max(128)
+    .optional()
+    .describe("Exact prefix length."),
   is_pool: z.boolean().optional(),
   mark_utilized: z.boolean().optional(),
 };
@@ -65,8 +78,14 @@ const prefixCreate = {
   scope_type: z
     .enum(["dcim.site", "dcim.location", "dcim.region", "dcim.sitegroup"])
     .optional()
-    .describe("Scope object type. NetBox 4.2+ replaced the prefix 'site' field with a generic scope; set together with scope_id."),
-  scope_id: z.number().int().optional().describe("Numeric id of the scope object (e.g. the site id)."),
+    .describe(
+      "Scope object type. NetBox 4.2+ replaced the prefix 'site' field with a generic scope; set together with scope_id.",
+    ),
+  scope_id: z
+    .number()
+    .int()
+    .optional()
+    .describe("Numeric id of the scope object (e.g. the site id)."),
   vrf: z.number().int().optional().describe("VRF id; omit for the global table."),
   tenant: z.number().int().optional(),
   vlan: z.number().int().optional().describe("VLAN id this prefix belongs to."),
@@ -87,7 +106,12 @@ const prefixUpdate = {
     .nullable()
     .optional()
     .describe("Scope object type (NetBox 4.2+ replaced 'site' with scope)."),
-  scope_id: z.number().int().nullable().optional().describe("Numeric id of the scope object."),
+  scope_id: z
+    .number()
+    .int()
+    .nullable()
+    .optional()
+    .describe("Numeric id of the scope object."),
   vrf: z.number().int().nullable().optional(),
   tenant: z.number().int().nullable().optional(),
   vlan: z.number().int().nullable().optional(),
@@ -121,12 +145,18 @@ const ipAddressFilters = {
 const ipAddressCreate = {
   address: z
     .string()
-    .describe("Address in CIDR notation, e.g. '10.0.0.5/24' or '2001:db8::1/64' (required)."),
+    .describe(
+      "Address in CIDR notation, e.g. '10.0.0.5/24' or '2001:db8::1/64' (required).",
+    ),
   status: z.enum(IP_STATUS).default("active"),
   role: z.enum(IP_ROLE).optional(),
   vrf: z.number().int().optional(),
   tenant: z.number().int().optional(),
-  nat_inside: z.number().int().optional().describe("Numeric id of the inside (private) IP."),
+  nat_inside: z
+    .number()
+    .int()
+    .optional()
+    .describe("Numeric id of the inside (private) IP."),
   assigned_object_type: z
     .enum(["dcim.interface", "virtualization.vminterface"])
     .optional()
@@ -183,8 +213,15 @@ const vlanCreate = {
   group: z.number().int().optional(),
   role: z.number().int().optional(),
   tenant: z.number().int().optional(),
-  qinq_role: z.enum(["svlan", "cvlan"]).optional().describe("Q-in-Q role (service vs customer VLAN)."),
-  qinq_svlan: z.number().int().optional().describe("Q-in-Q service VLAN id (when this VLAN is a cvlan)."),
+  qinq_role: z
+    .enum(["svlan", "cvlan"])
+    .optional()
+    .describe("Q-in-Q role (service vs customer VLAN)."),
+  qinq_svlan: z
+    .number()
+    .int()
+    .optional()
+    .describe("Q-in-Q service VLAN id (when this VLAN is a cvlan)."),
   description: z.string().max(200).optional(),
   comments: z.string().optional(),
   tags: TagSlugsSchema,
@@ -232,8 +269,14 @@ const vrfCreate = {
   name: z.string().min(1).max(100).describe("VRF name (required)."),
   rd: z.string().max(21).optional().describe("Route distinguisher."),
   enforce_unique: z.boolean().optional(),
-  import_targets: z.array(z.number().int()).optional().describe("Array of route-target ids to import."),
-  export_targets: z.array(z.number().int()).optional().describe("Array of route-target ids to export."),
+  import_targets: z
+    .array(z.number().int())
+    .optional()
+    .describe("Array of route-target ids to import."),
+  export_targets: z
+    .array(z.number().int())
+    .optional()
+    .describe("Array of route-target ids to export."),
   tenant: z.number().int().optional(),
   description: z.string().max(200).optional(),
   comments: z.string().optional(),
@@ -245,8 +288,14 @@ const vrfUpdate = {
   name: z.string().min(1).max(100).optional(),
   rd: z.string().max(21).nullable().optional(),
   enforce_unique: z.boolean().optional(),
-  import_targets: z.array(z.number().int()).optional().describe("Array of route-target ids to import."),
-  export_targets: z.array(z.number().int()).optional().describe("Array of route-target ids to export."),
+  import_targets: z
+    .array(z.number().int())
+    .optional()
+    .describe("Array of route-target ids to import."),
+  export_targets: z
+    .array(z.number().int())
+    .optional()
+    .describe("Array of route-target ids to export."),
   tenant: z.number().int().nullable().optional(),
   description: z.string().max(200).optional(),
   comments: z.string().optional(),
@@ -301,12 +350,19 @@ const VLAN_GROUP_SCOPES = [
 const vlanGroupCreate = {
   name: z.string().min(1).max(100).describe("VLAN group name (required)."),
   slug: z.string().min(1).max(100).regex(IPAM_SLUG).describe("URL-safe slug (required)."),
-  scope_type: z.enum(VLAN_GROUP_SCOPES).optional().describe("Scope object type; set together with scope_id."),
+  scope_type: z
+    .enum(VLAN_GROUP_SCOPES)
+    .optional()
+    .describe("Scope object type; set together with scope_id."),
   scope_id: z.number().int().optional().describe("Numeric id of the scope object."),
   vid_ranges: z
-    .array(z.tuple([z.number().int().min(1).max(4094), z.number().int().min(1).max(4094)]))
+    .array(
+      z.tuple([z.number().int().min(1).max(4094), z.number().int().min(1).max(4094)]),
+    )
     .optional()
-    .describe("Allowed VLAN id ranges as [start, end] pairs, e.g. [[1,999],[2000,2999]]. NetBox 4.x replaced min_vid/max_vid with this. Defaults to [[1,4094]]."),
+    .describe(
+      "Allowed VLAN id ranges as [start, end] pairs, e.g. [[1,999],[2000,2999]]. NetBox 4.x replaced min_vid/max_vid with this. Defaults to [[1,4094]].",
+    ),
   tenant: z.number().int().optional(),
   description: z.string().max(200).optional(),
   comments: z.string().optional(),
@@ -319,7 +375,9 @@ const vlanGroupUpdate = {
   scope_type: z.enum(VLAN_GROUP_SCOPES).nullable().optional(),
   scope_id: z.number().int().nullable().optional(),
   vid_ranges: z
-    .array(z.tuple([z.number().int().min(1).max(4094), z.number().int().min(1).max(4094)]))
+    .array(
+      z.tuple([z.number().int().min(1).max(4094), z.number().int().min(1).max(4094)]),
+    )
     .optional(),
   tenant: z.number().int().nullable().optional(),
   description: z.string().max(200).optional(),
@@ -350,13 +408,20 @@ const aggregateUpdate = {
 };
 
 const ipRangeCreate = {
-  start_address: z.string().describe("First address with mask, e.g. '10.0.0.10/24' (required)."),
-  end_address: z.string().describe("Last address with mask, e.g. '10.0.0.20/24' (required)."),
+  start_address: z
+    .string()
+    .describe("First address with mask, e.g. '10.0.0.10/24' (required)."),
+  end_address: z
+    .string()
+    .describe("Last address with mask, e.g. '10.0.0.20/24' (required)."),
   vrf: z.number().int().optional().describe("VRF id; omit for the global table."),
   tenant: z.number().int().optional(),
   role: z.number().int().optional().describe("IPAM role id."),
   status: z.enum(IP_RANGE_STATUS).default("active"),
-  mark_utilized: z.boolean().optional().describe("Treat the entire range as fully utilized."),
+  mark_utilized: z
+    .boolean()
+    .optional()
+    .describe("Treat the entire range as fully utilized."),
   description: z.string().max(200).optional(),
   comments: z.string().optional(),
   tags: TagSlugsSchema,
@@ -395,111 +460,151 @@ const ipamRoleUpdate = {
 
 export function registerIpam(server: McpServer): void {
   // prefixes
-  registerList(server, {
-    endpoint: "ipam/prefixes",
-    singular: "prefix",
-    plural: "prefixes",
-    description: "IP prefixes (subnets)",
-    listFields: [
-      "prefix",
-      "status",
-      "vrf",
-      "role",
-      "site",
-      "tenant",
-      "is_pool",
-      "description",
-    ],
-  }, prefixFilters);
+  registerList(
+    server,
+    {
+      endpoint: "ipam/prefixes",
+      singular: "prefix",
+      plural: "prefixes",
+      description: "IP prefixes (subnets)",
+      listFields: [
+        "prefix",
+        "status",
+        "vrf",
+        "role",
+        "site",
+        "tenant",
+        "is_pool",
+        "description",
+      ],
+    },
+    prefixFilters,
+  );
   registerGet(server, {
     endpoint: "ipam/prefixes",
     singular: "prefix",
     plural: "prefixes",
     description: "IP prefixes",
   });
-  registerCreate(server, {
-    endpoint: "ipam/prefixes",
-    singular: "prefix",
-    plural: "prefixes",
-    description: "IP prefixes",
-  }, prefixCreate);
-  registerUpdate(server, {
-    endpoint: "ipam/prefixes",
-    singular: "prefix",
-    plural: "prefixes",
-    description: "IP prefixes",
-  }, prefixUpdate);
+  registerCreate(
+    server,
+    {
+      endpoint: "ipam/prefixes",
+      singular: "prefix",
+      plural: "prefixes",
+      description: "IP prefixes",
+    },
+    prefixCreate,
+  );
+  registerUpdate(
+    server,
+    {
+      endpoint: "ipam/prefixes",
+      singular: "prefix",
+      plural: "prefixes",
+      description: "IP prefixes",
+    },
+    prefixUpdate,
+  );
 
   // ip addresses
-  registerList(server, {
-    endpoint: "ipam/ip-addresses",
-    singular: "ip_address",
-    plural: "ip_addresses",
-    description: "individual IP addresses",
-    listFields: [
-      "address",
-      "status",
-      "role",
-      "vrf",
-      "tenant",
-      "assigned_object",
-      "dns_name",
-      "description",
-    ],
-  }, ipAddressFilters);
+  registerList(
+    server,
+    {
+      endpoint: "ipam/ip-addresses",
+      singular: "ip_address",
+      plural: "ip_addresses",
+      description: "individual IP addresses",
+      listFields: [
+        "address",
+        "status",
+        "role",
+        "vrf",
+        "tenant",
+        "assigned_object",
+        "dns_name",
+        "description",
+      ],
+    },
+    ipAddressFilters,
+  );
   registerGet(server, {
     endpoint: "ipam/ip-addresses",
     singular: "ip_address",
     plural: "ip_addresses",
     description: "individual IP addresses",
   });
-  registerCreate(server, {
-    endpoint: "ipam/ip-addresses",
-    singular: "ip_address",
-    plural: "ip_addresses",
-    description: "individual IP addresses",
-  }, ipAddressCreate);
-  registerUpdate(server, {
-    endpoint: "ipam/ip-addresses",
-    singular: "ip_address",
-    plural: "ip_addresses",
-    description: "individual IP addresses",
-  }, ipAddressUpdate);
+  registerCreate(
+    server,
+    {
+      endpoint: "ipam/ip-addresses",
+      singular: "ip_address",
+      plural: "ip_addresses",
+      description: "individual IP addresses",
+    },
+    ipAddressCreate,
+  );
+  registerUpdate(
+    server,
+    {
+      endpoint: "ipam/ip-addresses",
+      singular: "ip_address",
+      plural: "ip_addresses",
+      description: "individual IP addresses",
+    },
+    ipAddressUpdate,
+  );
 
   // vlans
-  registerList(server, {
-    endpoint: "ipam/vlans",
-    singular: "vlan",
-    plural: "vlans",
-    description: "layer-2 VLANs",
-    listFields: ["vid", "name", "status", "site", "group", "role", "tenant"],
-  }, vlanFilters);
+  registerList(
+    server,
+    {
+      endpoint: "ipam/vlans",
+      singular: "vlan",
+      plural: "vlans",
+      description: "layer-2 VLANs",
+      listFields: ["vid", "name", "status", "site", "group", "role", "tenant"],
+    },
+    vlanFilters,
+  );
   registerGet(server, {
     endpoint: "ipam/vlans",
     singular: "vlan",
     plural: "vlans",
     description: "layer-2 VLANs",
   });
-  registerCreate(server, {
-    endpoint: "ipam/vlans",
-    singular: "vlan",
-    plural: "vlans",
-    description: "layer-2 VLANs",
-  }, vlanCreate);
-  registerUpdate(server, {
-    endpoint: "ipam/vlans",
-    singular: "vlan",
-    plural: "vlans",
-    description: "layer-2 VLANs",
-  }, vlanUpdate);
+  registerCreate(
+    server,
+    {
+      endpoint: "ipam/vlans",
+      singular: "vlan",
+      plural: "vlans",
+      description: "layer-2 VLANs",
+    },
+    vlanCreate,
+  );
+  registerUpdate(
+    server,
+    {
+      endpoint: "ipam/vlans",
+      singular: "vlan",
+      plural: "vlans",
+      description: "layer-2 VLANs",
+    },
+    vlanUpdate,
+  );
 
   // vlan groups (read-only)
-  registerList(server, {
-    endpoint: "ipam/vlan-groups",
-    singular: "vlan_group",
-    plural: "vlan_groups",
-    description: "groupings of VLANs (enforce vid uniqueness within a scope)",
-  }, vlanGroupFilters);
+  registerList(
+    server,
+    {
+      endpoint: "ipam/vlan-groups",
+      singular: "vlan_group",
+      plural: "vlan_groups",
+      description: "groupings of VLANs (enforce vid uniqueness within a scope)",
+    },
+    vlanGroupFilters,
+  );
   registerGet(server, {
     endpoint: "ipam/vlan-groups",
     singular: "vlan_group",
@@ -507,53 +612,77 @@ export function registerIpam(server: McpServer): void {
     description: "VLAN groups",
   });
 
-  registerCreate(server, {
-    endpoint: "ipam/vlan-groups",
-    singular: "vlan_group",
-    plural: "vlan_groups",
-    description: "VLAN groups",
-  }, vlanGroupCreate);
-  registerUpdate(server, {
-    endpoint: "ipam/vlan-groups",
-    singular: "vlan_group",
-    plural: "vlan_groups",
-    description: "VLAN groups",
-  }, vlanGroupUpdate);
+  registerCreate(
+    server,
+    {
+      endpoint: "ipam/vlan-groups",
+      singular: "vlan_group",
+      plural: "vlan_groups",
+      description: "VLAN groups",
+    },
+    vlanGroupCreate,
+  );
+  registerUpdate(
+    server,
+    {
+      endpoint: "ipam/vlan-groups",
+      singular: "vlan_group",
+      plural: "vlan_groups",
+      description: "VLAN groups",
+    },
+    vlanGroupUpdate,
+  );
 
   // vrfs
-  registerList(server, {
-    endpoint: "ipam/vrfs",
-    singular: "vrf",
-    plural: "vrfs",
-    description: "VRFs (routing tables)",
-    listFields: ["name", "rd", "enforce_unique", "tenant", "description"],
-  }, vrfFilters);
+  registerList(
+    server,
+    {
+      endpoint: "ipam/vrfs",
+      singular: "vrf",
+      plural: "vrfs",
+      description: "VRFs (routing tables)",
+      listFields: ["name", "rd", "enforce_unique", "tenant", "description"],
+    },
+    vrfFilters,
+  );
   registerGet(server, {
     endpoint: "ipam/vrfs",
     singular: "vrf",
     plural: "vrfs",
     description: "VRFs",
   });
-  registerCreate(server, {
-    endpoint: "ipam/vrfs",
-    singular: "vrf",
-    plural: "vrfs",
-    description: "VRFs",
-  }, vrfCreate);
-  registerUpdate(server, {
-    endpoint: "ipam/vrfs",
-    singular: "vrf",
-    plural: "vrfs",
-    description: "VRFs",
-  }, vrfUpdate);
+  registerCreate(
+    server,
+    {
+      endpoint: "ipam/vrfs",
+      singular: "vrf",
+      plural: "vrfs",
+      description: "VRFs",
+    },
+    vrfCreate,
+  );
+  registerUpdate(
+    server,
+    {
+      endpoint: "ipam/vrfs",
+      singular: "vrf",
+      plural: "vrfs",
+      description: "VRFs",
+    },
+    vrfUpdate,
+  );
 
   // aggregates (read-only)
-  registerList(server, {
-    endpoint: "ipam/aggregates",
-    singular: "aggregate",
-    plural: "aggregates",
-    description: "aggregate prefixes from RIRs",
-  }, aggregateFilters);
+  registerList(
+    server,
+    {
+      endpoint: "ipam/aggregates",
+      singular: "aggregate",
+      plural: "aggregates",
+      description: "aggregate prefixes from RIRs",
+    },
+    aggregateFilters,
+  );
   registerGet(server, {
     endpoint: "ipam/aggregates",
     singular: "aggregate",
@@ -561,26 +690,38 @@ export function registerIpam(server: McpServer): void {
     description: "aggregate prefixes",
   });
 
-  registerCreate(server, {
-    endpoint: "ipam/aggregates",
-    singular: "aggregate",
-    plural: "aggregates",
-    description: "aggregate prefixes",
-  }, aggregateCreate);
-  registerUpdate(server, {
-    endpoint: "ipam/aggregates",
-    singular: "aggregate",
-    plural: "aggregates",
-    description: "aggregate prefixes",
-  }, aggregateUpdate);
+  registerCreate(
+    server,
+    {
+      endpoint: "ipam/aggregates",
+      singular: "aggregate",
+      plural: "aggregates",
+      description: "aggregate prefixes",
+    },
+    aggregateCreate,
+  );
+  registerUpdate(
+    server,
+    {
+      endpoint: "ipam/aggregates",
+      singular: "aggregate",
+      plural: "aggregates",
+      description: "aggregate prefixes",
+    },
+    aggregateUpdate,
+  );
 
   // ip ranges (read-only)
-  registerList(server, {
-    endpoint: "ipam/ip-ranges",
-    singular: "ip_range",
-    plural: "ip_ranges",
-    description: "IP ranges (start/end address pairs)",
-  }, ipRangeFilters);
+  registerList(
+    server,
+    {
+      endpoint: "ipam/ip-ranges",
+      singular: "ip_range",
+      plural: "ip_ranges",
+      description: "IP ranges (start/end address pairs)",
+    },
+    ipRangeFilters,
+  );
   registerGet(server, {
     endpoint: "ipam/ip-ranges",
     singular: "ip_range",
@@ -588,26 +729,38 @@ export function registerIpam(server: McpServer): void {
     description: "IP ranges",
   });
 
-  registerCreate(server, {
-    endpoint: "ipam/ip-ranges",
-    singular: "ip_range",
-    plural: "ip_ranges",
-    description: "IP ranges",
-  }, ipRangeCreate);
-  registerUpdate(server, {
-    endpoint: "ipam/ip-ranges",
-    singular: "ip_range",
-    plural: "ip_ranges",
-    description: "IP ranges",
-  }, ipRangeUpdate);
+  registerCreate(
+    server,
+    {
+      endpoint: "ipam/ip-ranges",
+      singular: "ip_range",
+      plural: "ip_ranges",
+      description: "IP ranges",
+    },
+    ipRangeCreate,
+  );
+  registerUpdate(
+    server,
+    {
+      endpoint: "ipam/ip-ranges",
+      singular: "ip_range",
+      plural: "ip_ranges",
+      description: "IP ranges",
+    },
+    ipRangeUpdate,
+  );
 
   // roles (read-only)
-  registerList(server, {
-    endpoint: "ipam/roles",
-    singular: "role",
-    plural: "roles",
-    description: "IPAM role taxonomy (applied to prefixes/VLANs/IP ranges)",
-  }, roleFilters);
+  registerList(
+    server,
+    {
+      endpoint: "ipam/roles",
+      singular: "role",
+      plural: "roles",
+      description: "IPAM role taxonomy (applied to prefixes/VLANs/IP ranges)",
+    },
+    roleFilters,
+  );
   registerGet(server, {
     endpoint: "ipam/roles",
     singular: "role",
@@ -615,16 +768,24 @@ export function registerIpam(server: McpServer): void {
     description: "IPAM roles",
   });
 
-  registerCreate(server, {
-    endpoint: "ipam/roles",
-    singular: "role",
-    plural: "roles",
-    description: "IPAM roles",
-  }, ipamRoleCreate);
-  registerUpdate(server, {
-    endpoint: "ipam/roles",
-    singular: "role",
-    plural: "roles",
-    description: "IPAM roles",
-  }, ipamRoleUpdate);
+  registerCreate(
+    server,
+    {
+      endpoint: "ipam/roles",
+      singular: "role",
+      plural: "roles",
+      description: "IPAM roles",
+    },
+    ipamRoleCreate,
+  );
+  registerUpdate(
+    server,
+    {
+      endpoint: "ipam/roles",
+      singular: "role",
+      plural: "roles",
+      description: "IPAM roles",
+    },
+    ipamRoleUpdate,
+  );
 }

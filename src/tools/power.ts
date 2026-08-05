@@ -76,13 +76,25 @@ const powerFeedCreate = {
   name: z.string().min(1).max(100).describe("Feed name (required)."),
   rack: z.number().int().optional().describe("Rack id this feed serves."),
   status: z.enum(FEED_STATUS).default("active"),
-  type: z.enum(FEED_TYPE).default("primary").describe("'primary' or 'redundant' (A-side / B-side)."),
+  type: z
+    .enum(FEED_TYPE)
+    .default("primary")
+    .describe("'primary' or 'redundant' (A-side / B-side)."),
   supply: z.enum(FEED_SUPPLY).default("ac"),
   phase: z.enum(FEED_PHASE).default("single-phase"),
   voltage: z.number().int().optional().describe("Voltage (V)."),
   amperage: z.number().int().optional().describe("Amperage (A)."),
-  max_utilization: z.number().int().min(1).max(100).optional().describe("Max utilization percent (NetBox default 80)."),
-  mark_connected: z.boolean().optional().describe("Treat as connected even without a cable."),
+  max_utilization: z
+    .number()
+    .int()
+    .min(1)
+    .max(100)
+    .optional()
+    .describe("Max utilization percent (NetBox default 80)."),
+  mark_connected: z
+    .boolean()
+    .optional()
+    .describe("Treat as connected even without a cable."),
   tenant: z.number().int().optional().describe("Tenant id."),
   description: z.string().max(200).optional(),
   comments: z.string().optional(),
@@ -116,10 +128,18 @@ const powerPortFilters = {
   name: z.string().optional().describe("Exact port name."),
   name__ic: z.string().optional().describe("Port name contains (case-insensitive)."),
   type: z.string().optional().describe("Power port type slug."),
-  connected: z.boolean().optional().describe("Only connected (true) or unconnected (false) ports."),
+  connected: z
+    .boolean()
+    .optional()
+    .describe("Only connected (true) or unconnected (false) ports."),
 };
 const powerPortCreate = {
-  device_id: z.number().int().describe("Device id (required). Exposed as device_id (not device) for the remote-devices bridge; mapped to the API field device on write."),
+  device_id: z
+    .number()
+    .int()
+    .describe(
+      "Device id (required). Exposed as device_id (not device) for the remote-devices bridge; mapped to the API field device on write.",
+    ),
   name: z.string().min(1).max(64).describe("Power port name (required), e.g. 'PSU1'."),
   label: z.string().max(64).optional(),
   type: z.string().optional().describe(POWER_TYPE_HINT),
@@ -154,12 +174,26 @@ const powerOutletFilters = {
   feed_leg: z.enum(FEED_LEG).optional().describe("Phase leg: A, B, or C."),
 };
 const powerOutletCreate = {
-  device_id: z.number().int().describe("Device id (required). Exposed as device_id (not device) for the remote-devices bridge; mapped to the API field device on write."),
+  device_id: z
+    .number()
+    .int()
+    .describe(
+      "Device id (required). Exposed as device_id (not device) for the remote-devices bridge; mapped to the API field device on write.",
+    ),
   name: z.string().min(1).max(64).describe("Outlet name (required), e.g. 'Outlet 1'."),
   label: z.string().max(64).optional(),
   type: z.string().optional().describe(POWER_TYPE_HINT),
-  power_port: z.number().int().optional().describe("Parent power port id (the inlet on this same PDU that feeds this outlet)."),
-  feed_leg: z.enum(FEED_LEG).optional().describe("Phase leg this outlet is on: A, B, or C."),
+  power_port: z
+    .number()
+    .int()
+    .optional()
+    .describe(
+      "Parent power port id (the inlet on this same PDU that feeds this outlet).",
+    ),
+  feed_leg: z
+    .enum(FEED_LEG)
+    .optional()
+    .describe("Phase leg this outlet is on: A, B, or C."),
   mark_connected: z.boolean().optional(),
   description: z.string().max(200).optional(),
   tags: TagSlugsSchema,
@@ -215,7 +249,11 @@ const powerOutletTemplateCreate = {
   name: z.string().min(1).max(64).describe("Power outlet template name (required)."),
   label: z.string().max(64).optional(),
   type: z.string().optional().describe(POWER_TYPE_HINT),
-  power_port: z.number().int().optional().describe("Parent power port TEMPLATE id on the same device type."),
+  power_port: z
+    .number()
+    .int()
+    .optional()
+    .describe("Parent power port TEMPLATE id on the same device type."),
   feed_leg: z.enum(FEED_LEG).optional().describe("Phase leg: A, B, or C."),
   description: z.string().max(200).optional(),
 };
@@ -233,166 +271,267 @@ const powerOutletTemplateUpdate = {
 
 export function registerPower(server: McpServer): void {
   // power panels
-  registerList(server, {
-    endpoint: "dcim/power-panels",
-    singular: "power_panel",
-    plural: "power_panels",
-    description: "power distribution panels at a site",
-    listFields: ["name", "site", "location", "description"],
-  }, powerPanelFilters);
+  registerList(
+    server,
+    {
+      endpoint: "dcim/power-panels",
+      singular: "power_panel",
+      plural: "power_panels",
+      description: "power distribution panels at a site",
+      listFields: ["name", "site", "location", "description"],
+    },
+    powerPanelFilters,
+  );
   registerGet(server, {
     endpoint: "dcim/power-panels",
     singular: "power_panel",
     plural: "power_panels",
     description: "power distribution panels",
   });
-  registerCreate(server, {
-    endpoint: "dcim/power-panels",
-    singular: "power_panel",
-    plural: "power_panels",
-    description: "power distribution panels",
-  }, powerPanelCreate);
-  registerUpdate(server, {
-    endpoint: "dcim/power-panels",
-    singular: "power_panel",
-    plural: "power_panels",
-    description: "power distribution panels",
-  }, powerPanelUpdate);
+  registerCreate(
+    server,
+    {
+      endpoint: "dcim/power-panels",
+      singular: "power_panel",
+      plural: "power_panels",
+      description: "power distribution panels",
+    },
+    powerPanelCreate,
+  );
+  registerUpdate(
+    server,
+    {
+      endpoint: "dcim/power-panels",
+      singular: "power_panel",
+      plural: "power_panels",
+      description: "power distribution panels",
+    },
+    powerPanelUpdate,
+  );
 
   // power feeds
-  registerList(server, {
-    endpoint: "dcim/power-feeds",
-    singular: "power_feed",
-    plural: "power_feeds",
-    description: "power feeds (a circuit from a panel to a rack)",
-    listFields: ["name", "power_panel", "rack", "status", "type", "supply", "phase", "voltage", "amperage", "available_power"],
-  }, powerFeedFilters);
+  registerList(
+    server,
+    {
+      endpoint: "dcim/power-feeds",
+      singular: "power_feed",
+      plural: "power_feeds",
+      description: "power feeds (a circuit from a panel to a rack)",
+      listFields: [
+        "name",
+        "power_panel",
+        "rack",
+        "status",
+        "type",
+        "supply",
+        "phase",
+        "voltage",
+        "amperage",
+        "available_power",
+      ],
+    },
+    powerFeedFilters,
+  );
   registerGet(server, {
     endpoint: "dcim/power-feeds",
     singular: "power_feed",
     plural: "power_feeds",
     description: "power feeds",
   });
-  registerCreate(server, {
-    endpoint: "dcim/power-feeds",
-    singular: "power_feed",
-    plural: "power_feeds",
-    description: "power feeds",
-  }, powerFeedCreate, {
-    descriptionExtra: "available_power (watts) is computed by NetBox and read-only; it appears in responses but is not a writable field.",
-  });
-  registerUpdate(server, {
-    endpoint: "dcim/power-feeds",
-    singular: "power_feed",
-    plural: "power_feeds",
-    description: "power feeds",
-  }, powerFeedUpdate);
+  registerCreate(
+    server,
+    {
+      endpoint: "dcim/power-feeds",
+      singular: "power_feed",
+      plural: "power_feeds",
+      description: "power feeds",
+    },
+    powerFeedCreate,
+    {
+      descriptionExtra:
+        "available_power (watts) is computed by NetBox and read-only; it appears in responses but is not a writable field.",
+    },
+  );
+  registerUpdate(
+    server,
+    {
+      endpoint: "dcim/power-feeds",
+      singular: "power_feed",
+      plural: "power_feeds",
+      description: "power feeds",
+    },
+    powerFeedUpdate,
+  );
 
   // power ports (device-level)
-  registerList(server, {
-    endpoint: "dcim/power-ports",
-    singular: "power_port",
-    plural: "power_ports",
-    description: "device power inlets (PSU inlets)",
-    listFields: ["name", "device", "type", "maximum_draw", "allocated_draw", "cable", "description"],
-  }, powerPortFilters);
+  registerList(
+    server,
+    {
+      endpoint: "dcim/power-ports",
+      singular: "power_port",
+      plural: "power_ports",
+      description: "device power inlets (PSU inlets)",
+      listFields: [
+        "name",
+        "device",
+        "type",
+        "maximum_draw",
+        "allocated_draw",
+        "cable",
+        "description",
+      ],
+    },
+    powerPortFilters,
+  );
   registerGet(server, {
     endpoint: "dcim/power-ports",
     singular: "power_port",
     plural: "power_ports",
     description: "device power inlets",
   });
-  registerCreate(server, {
-    endpoint: "dcim/power-ports",
-    singular: "power_port",
-    plural: "power_ports",
-    description: "device power inlets",
-  }, powerPortCreate);
-  registerUpdate(server, {
-    endpoint: "dcim/power-ports",
-    singular: "power_port",
-    plural: "power_ports",
-    description: "device power inlets",
-  }, powerPortUpdate);
+  registerCreate(
+    server,
+    {
+      endpoint: "dcim/power-ports",
+      singular: "power_port",
+      plural: "power_ports",
+      description: "device power inlets",
+    },
+    powerPortCreate,
+  );
+  registerUpdate(
+    server,
+    {
+      endpoint: "dcim/power-ports",
+      singular: "power_port",
+      plural: "power_ports",
+      description: "device power inlets",
+    },
+    powerPortUpdate,
+  );
 
   // power outlets (device-level)
-  registerList(server, {
-    endpoint: "dcim/power-outlets",
-    singular: "power_outlet",
-    plural: "power_outlets",
-    description: "PDU power outlets",
-    listFields: ["name", "device", "type", "power_port", "feed_leg", "cable", "description"],
-  }, powerOutletFilters);
+  registerList(
+    server,
+    {
+      endpoint: "dcim/power-outlets",
+      singular: "power_outlet",
+      plural: "power_outlets",
+      description: "PDU power outlets",
+      listFields: [
+        "name",
+        "device",
+        "type",
+        "power_port",
+        "feed_leg",
+        "cable",
+        "description",
+      ],
+    },
+    powerOutletFilters,
+  );
   registerGet(server, {
     endpoint: "dcim/power-outlets",
     singular: "power_outlet",
     plural: "power_outlets",
     description: "PDU power outlets",
   });
-  registerCreate(server, {
-    endpoint: "dcim/power-outlets",
-    singular: "power_outlet",
-    plural: "power_outlets",
-    description: "PDU power outlets",
-  }, powerOutletCreate);
-  registerUpdate(server, {
-    endpoint: "dcim/power-outlets",
-    singular: "power_outlet",
-    plural: "power_outlets",
-    description: "PDU power outlets",
-  }, powerOutletUpdate);
+  registerCreate(
+    server,
+    {
+      endpoint: "dcim/power-outlets",
+      singular: "power_outlet",
+      plural: "power_outlets",
+      description: "PDU power outlets",
+    },
+    powerOutletCreate,
+  );
+  registerUpdate(
+    server,
+    {
+      endpoint: "dcim/power-outlets",
+      singular: "power_outlet",
+      plural: "power_outlets",
+      description: "PDU power outlets",
+    },
+    powerOutletUpdate,
+  );
 
   // power port templates (device-type-level)
-  registerList(server, {
-    endpoint: "dcim/power-port-templates",
-    singular: "power_port_template",
-    plural: "power_port_templates",
-    description: "power inlets defined on a device type (inherited by its devices)",
-    listFields: ["name", "device_type", "type", "maximum_draw", "allocated_draw"],
-  }, powerPortTemplateFilters);
+  registerList(
+    server,
+    {
+      endpoint: "dcim/power-port-templates",
+      singular: "power_port_template",
+      plural: "power_port_templates",
+      description: "power inlets defined on a device type (inherited by its devices)",
+      listFields: ["name", "device_type", "type", "maximum_draw", "allocated_draw"],
+    },
+    powerPortTemplateFilters,
+  );
   registerGet(server, {
     endpoint: "dcim/power-port-templates",
     singular: "power_port_template",
     plural: "power_port_templates",
     description: "power port templates",
   });
-  registerCreate(server, {
-    endpoint: "dcim/power-port-templates",
-    singular: "power_port_template",
-    plural: "power_port_templates",
-    description: "power port templates",
-  }, powerPortTemplateCreate);
-  registerUpdate(server, {
-    endpoint: "dcim/power-port-templates",
-    singular: "power_port_template",
-    plural: "power_port_templates",
-    description: "power port templates",
-  }, powerPortTemplateUpdate);
+  registerCreate(
+    server,
+    {
+      endpoint: "dcim/power-port-templates",
+      singular: "power_port_template",
+      plural: "power_port_templates",
+      description: "power port templates",
+    },
+    powerPortTemplateCreate,
+  );
+  registerUpdate(
+    server,
+    {
+      endpoint: "dcim/power-port-templates",
+      singular: "power_port_template",
+      plural: "power_port_templates",
+      description: "power port templates",
+    },
+    powerPortTemplateUpdate,
+  );
 
   // power outlet templates (device-type-level)
-  registerList(server, {
-    endpoint: "dcim/power-outlet-templates",
-    singular: "power_outlet_template",
-    plural: "power_outlet_templates",
-    description: "power outlets defined on a device type (inherited by its devices)",
-    listFields: ["name", "device_type", "type", "power_port", "feed_leg"],
-  }, powerOutletTemplateFilters);
+  registerList(
+    server,
+    {
+      endpoint: "dcim/power-outlet-templates",
+      singular: "power_outlet_template",
+      plural: "power_outlet_templates",
+      description: "power outlets defined on a device type (inherited by its devices)",
+      listFields: ["name", "device_type", "type", "power_port", "feed_leg"],
+    },
+    powerOutletTemplateFilters,
+  );
   registerGet(server, {
     endpoint: "dcim/power-outlet-templates",
     singular: "power_outlet_template",
     plural: "power_outlet_templates",
     description: "power outlet templates",
   });
-  registerCreate(server, {
-    endpoint: "dcim/power-outlet-templates",
-    singular: "power_outlet_template",
-    plural: "power_outlet_templates",
-    description: "power outlet templates",
-  }, powerOutletTemplateCreate);
-  registerUpdate(server, {
-    endpoint: "dcim/power-outlet-templates",
-    singular: "power_outlet_template",
-    plural: "power_outlet_templates",
-    description: "power outlet templates",
-  }, powerOutletTemplateUpdate);
+  registerCreate(
+    server,
+    {
+      endpoint: "dcim/power-outlet-templates",
+      singular: "power_outlet_template",
+      plural: "power_outlet_templates",
+      description: "power outlet templates",
+    },
+    powerOutletTemplateCreate,
+  );
+  registerUpdate(
+    server,
+    {
+      endpoint: "dcim/power-outlet-templates",
+      singular: "power_outlet_template",
+      plural: "power_outlet_templates",
+      description: "power outlet templates",
+    },
+    powerOutletTemplateUpdate,
+  );
 }

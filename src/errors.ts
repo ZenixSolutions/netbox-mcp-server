@@ -36,7 +36,10 @@ function formatAxiosError(error: AxiosError): string {
     if (error.code === "ECONNREFUSED") {
       return "Error: Connection to NetBox refused. Check NETBOX_URL and that the server is running.";
     }
-    if (error.code === "CERT_HAS_EXPIRED" || error.code === "DEPTH_ZERO_SELF_SIGNED_CERT") {
+    if (
+      error.code === "CERT_HAS_EXPIRED" ||
+      error.code === "DEPTH_ZERO_SELF_SIGNED_CERT"
+    ) {
       return (
         "Error: TLS certificate verification failed. " +
         "If this is an internal NetBox with a self-signed cert, set NETBOX_INSECURE=1."
@@ -67,9 +70,7 @@ function formatAxiosError(error: AxiosError): string {
         `Verify the ID/slug is correct. ${bodyMessage ?? ""}`
       ).trim();
     case 409:
-      return (
-        `Error: Conflict (409). ${bodyMessage ?? "An object with that name/slug likely already exists."}`
-      );
+      return `Error: Conflict (409). ${bodyMessage ?? "An object with that name/slug likely already exists."}`;
     case 429:
       return "Error: NetBox rate limit exceeded (429). Wait a moment and retry.";
     default:

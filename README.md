@@ -73,21 +73,21 @@ first).
 semantics), and `netbox_delete_<singular>` — plus `netbox_global_search`, which fans a
 fuzzy query out across resources in parallel.
 
-| Group | Tools | Covers |
-|---|---:|---|
-| `search` | 1 | cross-resource fuzzy lookup |
-| `dcim` | 40 | sites, locations, racks, manufacturers, device types, device roles, platforms, devices, interfaces, cables |
-| `dcim_org` | 20 | regions, site groups, rack roles, rack types, rack reservations |
-| `dcim_components` | 76 | modules, module/device bays, console + front + rear ports, MAC addresses, inventory items, and their templates |
-| `ipam` | 32 | prefixes, IP addresses, VLANs, VLAN groups, VRFs, aggregates, IP ranges, roles |
-| `ipam_org` | 16 | RIRs, ASNs, ASN ranges, route targets |
-| `ipam_services` | 24 | services, service templates, FHRP groups, VLAN translation policies + rules |
-| `inventory` | 28 | `netbox-inventory` plugin: assets, suppliers, purchases, deliveries |
-| `power` | 24 | power panels, feeds, ports, outlets, and templates |
-| `tenancy` | 24 | tenants, tenant groups, contacts, contact roles/groups/assignments |
-| `virtualization` | 28 | clusters, cluster types/groups, VMs, VM interfaces, virtual disks |
-| `circuits` | 44 | providers, provider accounts/networks, circuits, terminations, circuit groups, virtual circuits |
-| `deletes` | 89 | `netbox_delete_*` for every resource |
+| Group             | Tools | Covers                                                                                                         |
+| ----------------- | ----: | -------------------------------------------------------------------------------------------------------------- |
+| `search`          |     1 | cross-resource fuzzy lookup                                                                                    |
+| `dcim`            |    40 | sites, locations, racks, manufacturers, device types, device roles, platforms, devices, interfaces, cables     |
+| `dcim_org`        |    20 | regions, site groups, rack roles, rack types, rack reservations                                                |
+| `dcim_components` |    76 | modules, module/device bays, console + front + rear ports, MAC addresses, inventory items, and their templates |
+| `ipam`            |    32 | prefixes, IP addresses, VLANs, VLAN groups, VRFs, aggregates, IP ranges, roles                                 |
+| `ipam_org`        |    16 | RIRs, ASNs, ASN ranges, route targets                                                                          |
+| `ipam_services`   |    24 | services, service templates, FHRP groups, VLAN translation policies + rules                                    |
+| `inventory`       |    28 | `netbox-inventory` plugin: assets, suppliers, purchases, deliveries                                            |
+| `power`           |    24 | power panels, feeds, ports, outlets, and templates                                                             |
+| `tenancy`         |    24 | tenants, tenant groups, contacts, contact roles/groups/assignments                                             |
+| `virtualization`  |    28 | clusters, cluster types/groups, VMs, VM interfaces, virtual disks                                              |
+| `circuits`        |    44 | providers, provider accounts/networks, circuits, terminations, circuit groups, virtual circuits                |
+| `deletes`         |    89 | `netbox_delete_*` for every resource                                                                           |
 
 All list tools support:
 
@@ -101,13 +101,13 @@ All list tools support:
 
 ## Configuration
 
-| Variable | Required | Default | Meaning |
-|---|---|---|---|
-| `NETBOX_URL` | **yes** | — | Base URL of your NetBox, e.g. `https://netbox.corp.com`. **Omit `/api`** — the server appends it. A trailing `/` or `/api` is stripped for you. |
-| `NETBOX_TOKEN` | **yes** | — | NetBox API token. |
-| `NETBOX_INSECURE` | no | off | `1`/`true`/`yes` skips TLS certificate verification. For on-prem NetBox behind an internal CA. |
-| `NETBOX_READONLY` | no | off | `1`/`true`/`yes` registers only `list`, `get`, and `search` tools (179 total). Create, update, and delete tools are **not registered at all**. |
-| `NETBOX_TOOL_GROUPS` | no | all | Comma-separated allowlist of groups from the table above, e.g. `search,dcim,ipam`. Unknown names are ignored with a warning on stderr. |
+| Variable             | Required | Default | Meaning                                                                                                                                         |
+| -------------------- | -------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `NETBOX_URL`         | **yes**  | —       | Base URL of your NetBox, e.g. `https://netbox.corp.com`. **Omit `/api`** — the server appends it. A trailing `/` or `/api` is stripped for you. |
+| `NETBOX_TOKEN`       | **yes**  | —       | NetBox API token.                                                                                                                               |
+| `NETBOX_INSECURE`    | no       | off     | `1`/`true`/`yes` skips TLS certificate verification. For on-prem NetBox behind an internal CA.                                                  |
+| `NETBOX_READONLY`    | no       | off     | `1`/`true`/`yes` registers only `list`, `get`, and `search` tools (179 total). Create, update, and delete tools are **not registered at all**.  |
+| `NETBOX_TOOL_GROUPS` | no       | all     | Comma-separated allowlist of groups from the table above, e.g. `search,dcim,ipam`. Unknown names are ignored with a warning on stderr.          |
 
 Both `NETBOX_READONLY` and `NETBOX_TOOL_GROUPS` default to off — with neither set, the
 full 446-tool surface is registered, exactly as before these options existed.
@@ -155,7 +155,7 @@ curl -sS -H "Authorization: Token $NETBOX_TOKEN" \
 npx @modelcontextprotocol/inspector node dist/index.js
 ```
 
-Then ask your assistant: *"Using the netbox tools, list the first 5 sites."*
+Then ask your assistant: _"Using the netbox tools, list the first 5 sites."_
 
 `./scripts/install.sh --check` re-runs just the dependency checks at any time.
 
