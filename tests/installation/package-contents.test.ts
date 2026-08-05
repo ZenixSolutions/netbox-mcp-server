@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 interface PackResult {
@@ -49,6 +50,15 @@ describe("published package contents", () => {
   });
 
   it("ships the built entry point", () => {
+    // `files` points at `dist`, so this suite is meaningless without a build.
+    // Say that plainly: the bare assertion reads as "the package is broken"
+    // when the real cause is that `npm run build` has not run yet. CI ordered
+    // test before build and lost twenty minutes to exactly that.
+    expect(
+      existsSync("dist/index.js"),
+      "dist/index.js does not exist — run `npm run build` before this suite. " +
+        "`npm pack` can only report what the working tree actually contains.",
+    ).toBe(true);
     expect(paths).toContain("dist/index.js");
   });
 
