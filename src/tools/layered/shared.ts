@@ -153,6 +153,60 @@ export async function suggestTypes(
   return scored.slice(0, MAX_SUGGESTIONS).map((c) => c.key);
 }
 
+/**
+ * Rank arbitrary names against one that did not match. Used for filter names,
+ * where NetBox's silent tolerance of unknown parameters means a typo has to be
+ * diagnosed locally or not at all.
+ *
+ * Bigram overlap alone is not enough here: filter names are short and the
+ * commonest typo is a transposition, which shares NO bigrams with the word it
+ * came from — `nmae` scores 0 against `name`. Edit distance catches exactly
+ * that, so the better of the two is used.
+ */
+export function suggestNames(
+  needle: string,
+  candidates: Iterable<string>,
+  limit = MAX_SUGGESTIONS,
+): string[] {
+  const target = normalise(needle);
+  if (target === "") return [];
+  return [...candidates]
+    .map((name) => {
+      const other = normalise(name);
+      return {
+        name,
+        score: Math.max(diceCoefficient(target, other), editSimilarity(target, other)),
+      };
+    })
+    .filter((entry) => entry.score >= 0.34)
+    .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name))
+    .slice(0, limit)
+    .map((entry) => entry.name);
+}
+
+/** 1 for identical, 0 when every character differs. */
+function editSimilarity(a: string, b: string): number {
+  const longest = Math.max(a.length, b.length);
+  if (longest === 0) return 0;
+  return 1 - levenshtein(a, b) / longest;
+}
+
+function levenshtein(a: string, b: string): number {
+  if (a === b) return 0;
+  let previous = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    const current = [i];
+    for (let j = 1; j <= b.length; j++) {
+      const substitution = (previous[j - 1] ?? 0) + (a[i - 1] === b[j - 1] ? 0 : 1);
+      const deletion = (previous[j] ?? 0) + 1;
+      const insertion = (current[j - 1] ?? 0) + 1;
+      current[j] = Math.min(substitution, deletion, insertion);
+    }
+    previous = current;
+  }
+  return previous[b.length] ?? Math.max(a.length, b.length);
+}
+
 function normalise(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]/g, "");
 }

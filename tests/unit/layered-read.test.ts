@@ -71,7 +71,18 @@ function provider(): SchemaProvider {
         operation,
         endpoint: "dcim/devices",
         fields: [],
-        filters: [{ name: "site", type: "string", description: "Site slug." }],
+        // Shaped like the real thing: `filters` is the summary a model is
+        // shown, `filterNames` is the complete parameter set. `name__ic` is in
+        // the complete set and not the summary; `status__n` is in neither and
+        // has to pass on the lookup-suffix grammar alone.
+        filters: [
+          { name: "q", type: "string" },
+          { name: "id", type: "integer" },
+          { name: "name", type: "string" },
+          { name: "site", type: "string", description: "Site slug." },
+          { name: "status", type: "string" },
+        ],
+        filterNames: ["q", "id", "name", "site", "status", "name__ic", "id__gte"],
         filterGrammar: "Most filters accept `__n`, `__ic`, `__gte` and similar suffixes.",
         dependsOn: [],
         notes: [],
@@ -221,22 +232,107 @@ describe("list", () => {
     expect(result.text).toContain("(no results)");
   });
 
-  it("points at netbox_describe when NetBox rejects a filter", async () => {
+  it("points at netbox_describe when NetBox rejects a filter VALUE", async () => {
+    // A name this type accepts, with a value it does not. That judgement is
+    // NetBox's and it makes it: a live 4.6.0 answers 400 with the valid
+    // choices. Only unknown NAMES are decided locally.
     http.list.mockRejectedValue(
       Object.assign(new Error("Request failed with status code 400"), {
         isAxiosError: true,
-        response: { status: 400, data: { detail: "Unknown filter field" } },
+        response: {
+          status: 400,
+          data: {
+            status: ["Select a valid choice. nope is not one of the available choices."],
+          },
+        },
         toJSON: () => ({}),
       }),
     );
     const result = await read(client, {
       object_type: "dcim.device",
       operation: "list",
-      filters: { nonsense: "1" },
+      filters: { status: "nope" },
     });
+    expect(http.list).toHaveBeenCalled();
     expect(result.isError).toBe(true);
     expect(result.text).toContain("Error: NetBox rejected the request (400 Bad Request)");
     expect(result.text).toContain("netbox_describe");
+  });
+});
+
+/**
+ * A live NetBox 4.6.0 answered HTTP 200 and the FULL unfiltered collection for
+ * `?nb_mcp_contract_probe=1`. Nothing downstream can detect that: the model
+ * asked for the devices at one site, got every device, and has no way to know.
+ * NetBox will not reject an unknown filter name, so this layer must.
+ */
+describe("unknown filter names are rejected locally", () => {
+  it("refuses a misspelled filter and never sends the request", async () => {
+    http.list.mockResolvedValue(page(3, 3));
+    const result = await read(client, {
+      object_type: "dcim.device",
+      operation: "list",
+      filters: { nmae: "sw-core-01" },
+    });
+    expect(result.isError).toBe(true);
+    expect(result.text).toContain("has no such filter");
+    expect(result.text).toContain('"nmae"');
+    expect(result.text).toContain("did you mean: name");
+    expect(result.text).toMatch(/ignores query parameters it does not recognise/i);
+    expect(http.list).not.toHaveBeenCalled();
+  });
+
+  it("accepts a lookup-suffix variant the summary elides", async () => {
+    // `name__ic` is legitimate, is in the derived parameter set, and is NOT in
+    // the list netbox_describe shows. Validating against the summary would
+    // reject the exact thing filterGrammar tells models to write.
+    http.list.mockResolvedValue(page(1, 1));
+    const result = await read(client, {
+      object_type: "dcim.device",
+      operation: "list",
+      filters: { name__ic: "core" },
+    });
+    expect(result.isError).toBe(false);
+    expect(http.list).toHaveBeenCalledWith("dcim/devices", {
+      name__ic: "core",
+      limit: 50,
+      offset: 0,
+    });
+  });
+
+  it("accepts a grammar suffix on a known base the instance did not declare", async () => {
+    http.list.mockResolvedValue(page(1, 1));
+    const result = await read(client, {
+      object_type: "dcim.device",
+      operation: "list",
+      filters: { status__n: "offline" },
+    });
+    expect(result.isError).toBe(false);
+    expect(http.list).toHaveBeenCalled();
+  });
+
+  it("rejects a suffix on a base that does not exist", async () => {
+    http.list.mockResolvedValue(page(3, 3));
+    const result = await read(client, {
+      object_type: "dcim.device",
+      operation: "list",
+      filters: { nmae__ic: "core" },
+    });
+    expect(result.isError).toBe(true);
+    expect(http.list).not.toHaveBeenCalled();
+  });
+
+  it("names every unknown filter, not just the first", async () => {
+    http.list.mockResolvedValue(page(3, 3));
+    const result = await read(client, {
+      object_type: "dcim.device",
+      operation: "list",
+      filters: { nonsense: "1", site: "dc1", alsowrong: "2" },
+    });
+    expect(result.isError).toBe(true);
+    expect(result.text).toContain('"nonsense"');
+    expect(result.text).toContain('"alsowrong"');
+    expect(http.list).not.toHaveBeenCalled();
   });
 });
 

@@ -142,6 +142,126 @@ describe("path classification", () => {
     expect(singularise("devices")).toBe("device");
     expect(singularise("rirs")).toBe("rir");
   });
+
+  /**
+   * `plugins/inventory/purchases` derived as `plugins.inventory.purchas` on a
+   * live 4.6.0: stripping `-es` after any sibilant is right for `addresses`
+   * and wrong for `purchases`. The endpoint sweep did not catch it because the
+   * endpoint is stored, not reconstructed — but the key is what a model passes
+   * to netbox_read, and no user would ever guess the misspelling.
+   */
+  it("does not eat the -e of a -ses plural whose singular is not sibilant", () => {
+    expect(singularise("purchases")).toBe("purchase");
+    expect(singularise("licenses")).toBe("license");
+    expect(singularise("deliveries")).toBe("delivery");
+  });
+
+  it("still strips -es where the singular really is sibilant-final", () => {
+    expect(singularise("addresses")).toBe("address");
+    expect(singularise("mac-addresses")).toBe("macaddress");
+    expect(singularise("boxes")).toBe("box");
+    expect(singularise("statuses")).toBe("status");
+  });
+
+  it("leaves the slugs the previous rule already got right alone", () => {
+    expect(singularise("ip-addresses")).toBe("ipaddress");
+    expect(singularise("device-types")).toBe("devicetype");
+    expect(singularise("interfaces")).toBe("interface");
+    expect(singularise("assets")).toBe("asset");
+    expect(singularise("services")).toBe("service");
+  });
+});
+
+/**
+ * The slug is a routing convenience. The component the schema resolves is the
+ * serializer's own name for the model, and it is the thing the singularisation
+ * heuristic is guessing at — so where the two agree modulo pluralisation, the
+ * component wins.
+ */
+describe("the object-type key prefers a resolved component over the slug", () => {
+  function pluginDocument(slug: string, model: string): OpenApiDocument {
+    return {
+      info: { version: "4.6.0" },
+      paths: {
+        [`/api/plugins/inventory/${slug}/`]: {
+          get: { description: `Get a list of ${model.toLowerCase()} objects.` },
+          post: {
+            requestBody: {
+              content: {
+                "application/json": {
+                  schema: { $ref: `#/components/schemas/${model}Request` },
+                },
+              },
+            },
+          },
+        },
+        [`/api/plugins/inventory/${slug}/{id}/`]: {
+          get: {
+            responses: {
+              "200": {
+                content: {
+                  "application/json": {
+                    schema: { $ref: `#/components/schemas/${model}` },
+                  },
+                },
+              },
+            },
+          },
+          put: {
+            requestBody: {
+              content: {
+                "application/json": {
+                  schema: { $ref: `#/components/schemas/${model}Request` },
+                },
+              },
+            },
+          },
+        },
+      },
+      components: { schemas: {} },
+    };
+  }
+
+  it("derives plugins.inventory.purchase from the Purchase component", () => {
+    const derived = buildRegistry(pluginDocument("purchases", "Purchase"));
+    expect([...derived.types.keys()]).toEqual(["plugins.inventory.purchase"]);
+    // The endpoint is stored, never reconstructed from the key.
+    expect(derived.types.get("plugins.inventory.purchase")?.summary.endpoint).toBe(
+      "plugins/inventory/purchases",
+    );
+  });
+
+  it("keeps working for a plugin whose component and slug already agreed", () => {
+    expect([...buildRegistry(pluginDocument("assets", "Asset")).types.keys()]).toEqual([
+      "plugins.inventory.asset",
+    ]);
+    expect([
+      ...buildRegistry(pluginDocument("deliveries", "Delivery")).types.keys(),
+    ]).toEqual(["plugins.inventory.delivery"]);
+  });
+
+  it("ignores a component that is not the URL's noun", () => {
+    // `dcim/devices` resolves `DeviceWithConfigContext` and `users/permissions`
+    // resolves `ObjectPermission`. Trusting either blindly renames a core type.
+    expect([
+      ...buildRegistry(pluginDocument("devices", "DeviceWithConfigContext")).types.keys(),
+    ]).toEqual(["plugins.inventory.device"]);
+    expect([
+      ...buildRegistry(pluginDocument("permissions", "ObjectPermission")).types.keys(),
+    ]).toEqual(["plugins.inventory.permission"]);
+  });
+
+  it("derives the same keys as before for every type in the fixture", () => {
+    expect([...registry.types.keys()].sort()).toEqual([
+      "dcim.device",
+      "dcim.site",
+      "ipam.ipaddress",
+      "ipam.prefix",
+      // Still `permission`, not `objectpermission`: the fixture's own
+      // `ObjectPermission` component is not the URL's noun and is not trusted.
+      "users.permission",
+    ]);
+  });
 });
 
 describe("the object-type rule", () => {

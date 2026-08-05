@@ -78,6 +78,18 @@ export interface DescribeResult {
    * Returning all of them is not usable by a model.
    */
   filters?: FilterSpec[] | undefined;
+  /**
+   * EVERY query-parameter name the instance declares for this list endpoint,
+   * including the `__` lookup variants `filters` elides. Populated for list.
+   *
+   * Not for display — 342 names is exactly what the summary exists to avoid
+   * showing. This is the set a filter name is VALIDATED against, which the
+   * summary cannot be: `name__ic` is legitimate and is not in the summary.
+   * A live NetBox 4.6.0 answers 200 and the UNFILTERED collection for a
+   * parameter it does not recognise, so an unknown name has to be caught here
+   * or not at all.
+   */
+  filterNames?: string[] | undefined;
   /** One sentence describing the `__` lookup-suffix grammar that was elided. */
   filterGrammar?: string | undefined;
   /** Object types that must exist before this one can be created. */

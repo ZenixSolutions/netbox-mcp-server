@@ -22,18 +22,54 @@ import {
   ResponseFormat,
 } from "../../formatting.js";
 import { ResponseFormatField } from "../../schemas/common.js";
-import type { ObjectTypeSummary, SchemaProvider } from "../../schema/types.js";
+import type {
+  DescribeResult,
+  ObjectTypeSummary,
+  SchemaProvider,
+} from "../../schema/types.js";
 import {
   clampText,
   errorResult,
   requireOperation,
   resolveType,
+  suggestNames,
   textResult,
   toErrorText,
 } from "./shared.js";
 
 /** A query-parameter name NetBox could plausibly accept. */
 const FILTER_KEY = /^[a-zA-Z][a-zA-Z0-9_]*$/;
+
+/**
+ * The `__` lookup suffixes `FILTER_GRAMMAR` promises a model it may append.
+ *
+ * The derived parameter set already contains almost every combination, so this
+ * is a safety net rather than the rule: a suffix the instance did not happen to
+ * declare on a filter it did declare must not be rejected, because the grammar
+ * told the model to use it.
+ */
+const LOOKUP_SUFFIXES = new Set([
+  "n",
+  "ic",
+  "nic",
+  "isw",
+  "nisw",
+  "iew",
+  "niew",
+  "ie",
+  "nie",
+  "empty",
+  "regex",
+  "iregex",
+  "lt",
+  "lte",
+  "gt",
+  "gte",
+  "any",
+]);
+
+/** Parameters `netbox_read` supplies itself; always legitimate. */
+const PAGINATION_PARAMETERS = ["limit", "offset"];
 
 const FilterValue = z.union([
   z.string(),
@@ -63,7 +99,7 @@ const Input = {
     .record(z.string(), FilterValue)
     .optional()
     .describe(
-      "Query filters for 'list', as NetBox query-parameter names, e.g. { site: 'dc1', status: 'active', q: 'sw-core' }. Call netbox_describe(object_type, 'list') for the accepted names. An array value repeats the parameter (OR semantics for most filters).",
+      "Query filters for 'list', as NetBox query-parameter names, e.g. { site: 'dc1', status: 'active', q: 'sw-core' }. Call netbox_describe(object_type, 'list') for the accepted names. An array value repeats the parameter (OR semantics for most filters). A name this object type does not accept is rejected here rather than sent: NetBox silently ignores unknown parameters and would return the whole unfiltered collection.",
     ),
   limit: z
     .number()
@@ -117,7 +153,7 @@ export function registerRead(server: McpServer, schema: SchemaProvider): void {
         requireOperation(summary, args.operation);
         return args.operation === "get"
           ? await runGet(summary, args)
-          : await runList(summary, args);
+          : await runList(summary, args, schema);
       } catch (error) {
         return errorResult(toErrorText(error));
       }
@@ -161,17 +197,91 @@ async function runGet(
   });
 }
 
+/**
+ * Every filter name this type accepts, as a set.
+ *
+ * The summarised list a model is shown is not the valid set — it elides the
+ * `__` lookup variants (120 of 158 on `dcim.site`) — so the complete derived
+ * parameter list is what a name is checked against, with the summary folded in
+ * for a provider that only supplies one.
+ */
+function acceptedFilterNames(described: DescribeResult): Set<string> {
+  return new Set([
+    ...(described.filterNames ?? []),
+    ...(described.filters ?? []).map((filter) => filter.name),
+    ...PAGINATION_PARAMETERS,
+  ]);
+}
+
+function isAcceptedFilter(name: string, accepted: Set<string>): boolean {
+  if (accepted.has(name)) return true;
+  const separator = name.lastIndexOf("__");
+  if (separator <= 0) return false;
+  return (
+    LOOKUP_SUFFIXES.has(name.slice(separator + 2)) &&
+    accepted.has(name.slice(0, separator))
+  );
+}
+
+/**
+ * Reject a filter name this instance does not have.
+ *
+ * NetBox is TOLERANT of unknown query parameters: a live 4.6.0 answered HTTP
+ * 200 with the full unfiltered collection for `?nb_mcp_contract_probe=1`, and
+ * said nothing. So a model that misspells `site` does not get an error — it
+ * gets EVERY device, believes it filtered, and acts on the result. NetBox will
+ * not catch this, which is why it is caught here.
+ *
+ * Only unknown NAMES are rejected. A known filter with a bad value is NetBox's
+ * to judge and it does: it answers 400 naming the valid choices.
+ */
+function unknownFilterMessage(
+  summary: ObjectTypeSummary,
+  described: DescribeResult,
+  unknown: string[],
+): string {
+  const accepted = acceptedFilterNames(described);
+  const advertised = (described.filters ?? []).map((filter) => filter.name);
+  const suggestionPool = advertised.length > 0 ? advertised : [...accepted];
+  const named = unknown
+    .map((name) => {
+      const near = suggestNames(name, suggestionPool, 3);
+      return near.length > 0
+        ? `"${name}" (did you mean: ${near.join(", ")}?)`
+        : `"${name}"`;
+    })
+    .join(", ");
+  return (
+    `Error: ${summary.object_type} has no such filter: ${named}. ` +
+    "The request was NOT sent: NetBox ignores query parameters it does not recognise and " +
+    "would have returned the whole unfiltered collection as though the filter had applied. " +
+    `Call netbox_describe with object_type="${summary.object_type}" and operation="list" ` +
+    "for the accepted names, then retry."
+  );
+}
+
 async function runList(
   summary: ObjectTypeSummary,
   args: ReadArgs,
+  schema: SchemaProvider,
 ): Promise<CallToolResult> {
   const filters = args.filters ?? {};
-  const badKeys = Object.keys(filters).filter((k) => !FILTER_KEY.test(k));
+  const names = Object.keys(filters);
+  const badKeys = names.filter((k) => !FILTER_KEY.test(k));
   if (badKeys.length > 0) {
     return errorResult(
       `Error: not a NetBox filter name: ${badKeys.map((k) => `"${k}"`).join(", ")}. ` +
         `Call netbox_describe with object_type="${summary.object_type}" and operation="list" for the accepted filters.`,
     );
+  }
+
+  if (names.length > 0) {
+    const described = await schema.describe(summary.object_type, "list");
+    const accepted = acceptedFilterNames(described);
+    const unknown = names.filter((name) => !isAcceptedFilter(name, accepted));
+    if (unknown.length > 0) {
+      return errorResult(unknownFilterMessage(summary, described, unknown));
+    }
   }
 
   let response: PaginatedResponse<Record<string, unknown>>;

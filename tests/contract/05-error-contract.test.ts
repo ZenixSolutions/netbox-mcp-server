@@ -28,8 +28,10 @@
  * Nothing in this file may be changed to send a well-formed body or a real id.
  */
 
+import { AxiosError } from "axios";
 import { beforeAll, it } from "vitest";
 
+import { handleApiError } from "../../src/errors.js";
 import type { SchemaRegistry } from "../../src/schema/registry.js";
 import { asRecord, parseJson, preview } from "./http.js";
 import { api, derivedRegistry, env, record, requireReadOnlyToken } from "./harness.js";
@@ -42,6 +44,21 @@ const SECTION_WRITE = "8. Write refusal";
 const NONEXISTENT_ID = 2_147_483_600;
 
 const REFUSED = [401, 403];
+
+/**
+ * Feed a real response into the shipped formatter exactly as the client would,
+ * so the report shows what an operator would actually be told — not what the
+ * status code suggests they would be told.
+ */
+function asAxiosError(status: number, data: unknown): AxiosError {
+  const error = new AxiosError(
+    `Request failed with status code ${status}`,
+    String(status),
+  );
+  return Object.assign(error, {
+    response: { status, data } as NonNullable<AxiosError["response"]>,
+  });
+}
 
 function bodyShape(body: string): string {
   const parsed = asRecord(parseJson(body));
@@ -67,21 +84,34 @@ describeContract(`${SECTION} + ${SECTION_WRITE}`, () => {
     }
   }, 320_000);
 
-  it("rejects an invalid token with the status errors.ts expects", async () => {
+  it("rejects an invalid token with a status and body errors.ts can read", async () => {
     // Appending a character to a valid token yields a token of the wrong
     // length. It cannot collide with a real one.
     const result = await api("/status/", { token: `${env().token}0` });
+    // 4.6.0 answers 403 with {"detail":"Invalid v2 token"}, not 401. errors.ts
+    // now reads the `detail` rather than the status, so either status is
+    // handled — but only if the body says which cause it is.
+    const message = handleApiError(asAxiosError(result.status, parseJson(result.body)));
+    const namesTheToken = /NETBOX_TOKEN/.test(message);
+    const blamesPermissions = /object permissions|lacks permission for this object/i.test(
+      message,
+    );
     check({
       section: SECTION,
       check: "invalid token",
-      derived: "401 — errors.ts: 'authentication failed (401), check NETBOX_TOKEN'",
-      actual: `HTTP ${result.status} ${result.statusText}; body ${bodyShape(result.body)}`,
-      verdict: result.status === 401 ? "match" : "mismatch",
+      derived:
+        "401, or 403 whose body names the credential — errors.ts must send the operator to " +
+        "NETBOX_TOKEN and must NOT send them to audit object permissions",
+      actual:
+        `HTTP ${result.status} ${result.statusText}; body ${bodyShape(result.body)}; ` +
+        `errors.ts says: ${preview(message, 200)}`,
+      verdict: namesTheToken && !blamesPermissions ? "match" : "mismatch",
       note:
-        result.status === 401
+        namesTheToken && !blamesPermissions
           ? undefined
-          : `errors.ts has no branch for ${result.status} on authentication, so the operator ` +
-            "is told something other than 'your token is wrong'.",
+          : `errors.ts does not recognise this instance's ${result.status} body as a credential ` +
+            "failure, so the operator is told something other than 'your token is wrong'. Add " +
+            "the wording to BAD_CREDENTIAL in src/errors.ts.",
     });
   });
 
@@ -92,11 +122,14 @@ describeContract(`${SECTION} + ${SECTION_WRITE}`, () => {
       check: "no Authorization header",
       derived:
         "403 was observed on demo.netbox.dev (derivation §1.1); DRF would normally answer 401",
-      actual: `HTTP ${result.status} ${result.statusText}; body ${bodyShape(result.body)}`,
+      actual:
+        `HTTP ${result.status} ${result.statusText}; body ${bodyShape(result.body)}; ` +
+        `errors.ts says: ${preview(handleApiError(asAxiosError(result.status, parseJson(result.body))), 200)}`,
       verdict: "info",
       note:
         "The server always sends a token, so this only matters for diagnosing a proxy that " +
-        "strips the header — which presents as this status, not as a network error.",
+        "strips the header — which presents as this status, not as a network error. errors.ts " +
+        "names that case explicitly; check above that it did.",
     });
 
     const root = await api("/", { anonymous: true });
@@ -153,8 +186,26 @@ describeContract(`${SECTION} + ${SECTION_WRITE}`, () => {
       actual: `HTTP ${result.status}; content-type ${result.contentType || "none"}`,
       verdict: result.status === 404 ? "match" : "info",
       note: result.contentType.includes("html")
-        ? "NetBox answered with HTML, not JSON. extractNetBoxMessage returns the raw string, " +
-          "so a whole error page could reach the model. Worth bounding."
+        ? "NetBox answered with HTML, not JSON — an error page, not an error body."
+        : undefined,
+    });
+
+    // The body an HTML 404 produces is exactly what must NOT reach a model.
+    // extractNetBoxMessage bounds it; this is the live proof, on this
+    // instance's real error page rather than a fabricated one.
+    const message = handleApiError(asAxiosError(result.status, result.body));
+    const relaysMarkup = /<\/?(?:html|head|body|h1|div|script)\b/i.test(message);
+    check({
+      section: SECTION,
+      check: "the 404 body errors.ts would relay is bounded",
+      derived:
+        "no markup and at most a few hundred characters, however large the page NetBox served",
+      actual:
+        `page was ${result.bytes} byte(s); errors.ts produced ${message.length} character(s): ` +
+        preview(message, 200),
+      verdict: !relaysMarkup && message.length < 1_000 ? "match" : "mismatch",
+      note: relaysMarkup
+        ? "An upstream error page is reaching the model verbatim. Bound it in errors.ts."
         : undefined,
     });
   });
@@ -186,8 +237,11 @@ describeContract(`${SECTION} + ${SECTION_WRITE}`, () => {
       check: `POST /api/${writeProbeEndpoint}/ with a read-only token`,
       derived:
         "403 — NetBox's TokenPermissions denies unsafe methods when write_enabled is false, " +
-        "and errors.ts maps 403 to 'the API token lacks permission for this object or action'",
-      actual: `HTTP ${result.status} ${result.statusText}; body ${bodyShape(result.body)}`,
+        "and errors.ts reads the body: a permission wording produces 'permission denied', " +
+        "naming write_enabled as the commonest cause",
+      actual:
+        `HTTP ${result.status} ${result.statusText}; body ${bodyShape(result.body)}; ` +
+        `errors.ts says: ${preview(handleApiError(asAxiosError(result.status, parseJson(result.body))), 200)}`,
       verdict: REFUSED.includes(result.status)
         ? result.status === 403
           ? "match"
@@ -195,9 +249,7 @@ describeContract(`${SECTION} + ${SECTION_WRITE}`, () => {
         : "mismatch",
       note:
         result.status === 403
-          ? `Token capability established by ${capability}. Consider naming write_enabled in ` +
-            "the 403 message: 'read-only token' is the most common cause and errors.ts does " +
-            "not mention it."
+          ? `Token capability established by ${capability}.`
           : result.status === 401
             ? "401, not 403. errors.ts tells the operator their token is invalid or expired. " +
               "It is neither — it is read-only. That message sends them to the wrong fix."

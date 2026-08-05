@@ -398,6 +398,34 @@ describe("filter summarisation", () => {
     expect(list.filterGrammar?.length).toBeLessThan(700);
   });
 
+  /**
+   * The summary is what a model reads; it is NOT the valid set. NetBox ignores
+   * a query parameter it does not recognise and returns the whole collection,
+   * so netbox_read has to reject unknown names itself — and it can only do that
+   * against the complete parameter list, because `name__ic` is legitimate and
+   * is one of the 248 names the summary drops.
+   */
+  it("carries the complete parameter set alongside the summary, for validation", () => {
+    expect(list.filterNames).toHaveLength(342);
+    expect(list.filterNames).toContain("name");
+    expect(list.filterNames).toContain("name__ic");
+    expect(list.filterNames).toContain("status__n");
+    expect(list.filterNames).not.toContain("nmae");
+    // Everything shown is also in the validated set; nothing advertised is
+    // rejectable.
+    for (const filter of list.filters ?? []) {
+      expect(list.filterNames).toContain(filter.name);
+    }
+  });
+
+  it("does not offer a parameter set for the operations that have no filters", () => {
+    for (const operation of ["get", "create", "update", "delete"] as const) {
+      expect(
+        describeObjectType(registry, entryFor("dcim.device"), operation).filterNames,
+      ).toBeUndefined();
+    }
+  });
+
   it("summarises an enum filter as its value list rather than the glossary", () => {
     const airflow = list.filters?.find((filter) => filter.name === "airflow");
     expect(airflow?.description).toMatch(/^one of: /);
