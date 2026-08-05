@@ -45,11 +45,16 @@ jobs:
       - name: Format check
         run: npm run format:check
 
-      - name: Test
-        run: npm run test -- --coverage
-
+      # Build BEFORE test. `tests/installation/package-contents.test.ts` asks
+      # `npm pack` what would be published, and `files` points at `dist` — with
+      # no build the tarball is documents only and the test fails for a reason
+      # that has nothing to do with the change. It passed locally purely
+      # because a previous build had left `dist/` lying around.
       - name: Build
         run: npm run build
+
+      - name: Test
+        run: npm run test -- --coverage
 
       # The published package is the contract. Verify the CLI contract against
       # the built artifact, not the source tree.
@@ -74,7 +79,18 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: gitleaks
-        uses: gitleaks/gitleaks-action@v2
+      # The gitleaks CLI is open source and free. gitleaks-action is not: for a
+      # repository owned by an organization it fails with "License key is
+      # required", which is a billing message wearing the costume of a security
+      # finding. Run the scanner directly and keep the check meaningful.
+      - name: Install gitleaks
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_VERSION: "8.28.0"
+        run: |
+          curl -sSfL \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
+            | tar -xz -C /usr/local/bin gitleaks
+          gitleaks version
+
+      - name: Scan history for secrets
+        run: gitleaks detect --source . --redact --verbose --exit-code 1
