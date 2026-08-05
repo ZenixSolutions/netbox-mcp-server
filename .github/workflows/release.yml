@@ -1,0 +1,234 @@
+# Publishes @zenixsolutions/netbox-mcp to npm when a v* tag is pushed.
+#
+# Read docs/releasing.md before touching this file. The ordering and the
+# apparent redundancies here are each the result of a failed release on a
+# sibling server, and are commented individually.
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+# `id-token: write` is required for both npm provenance (token path) and the
+# OIDC exchange (trusted-publishing path). Without it npm silently falls back
+# and the failure is reported as a 404.
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: publish to npm
+    runs-on: ubuntu-latest
+
+    # `secrets` is NOT a permitted context in a step-level `if`. The allowed
+    # list is github, needs, strategy, matrix, job, runner, env, vars, steps,
+    # inputs. Using `secrets` there does not fail the step — it fails the whole
+    # workflow file to parse, so the run reports "this run likely failed
+    # because of a workflow file issue" with no jobs, no steps and no logs at
+    # all. It has to be lifted to job-level `env` and compared as a string.
+    #
+    # This branch exists because a package's FIRST publish cannot use trusted
+    # publishing: a trusted publisher is configured on a package's settings
+    # page, and a package that has never been published has no settings page.
+    # Publish once with a granular token, configure the publisher, delete the
+    # secret — no change to this file at either step.
+    env:
+      HAS_NPM_TOKEN: ${{ secrets.NPM_TOKEN != '' }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Trusted publishing needs Node 22.14+ and npm 11.5.1+.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          registry-url: "https://registry.npmjs.org"
+          cache: npm
+
+      # ---------------------------------------------------------------------
+      # Fast guards. These need no dependencies, so they run before `npm ci`
+      # and a bad tag fails in seconds rather than after a full install.
+      # ---------------------------------------------------------------------
+
+      - name: Verify the tag matches package.json
+        run: |
+          tag_version="${GITHUB_REF_NAME#v}"
+          pkg_version="$(node --input-type=commonjs -p "require('./package.json').version")"
+          if [ "$tag_version" != "$pkg_version" ]; then
+            echo "::error::Tag ${GITHUB_REF_NAME} implies version ${tag_version}, but package.json says ${pkg_version}. Bump package.json and re-tag; npm publishes what package.json says, not what the tag says."
+            exit 1
+          fi
+          echo "TAG_VERSION=${tag_version}" >> "$GITHUB_ENV"
+          echo "Releasing ${pkg_version} from ${GITHUB_REF_NAME}."
+
+      # A grep for the heading is satisfied by a section full of scaffolding.
+      # A version number on npm can never be reused, so this is checked before
+      # anything else runs.
+      - name: Check the changelog section
+        run: node scripts/check-changelog.mjs "$TAG_VERSION"
+
+      # ---------------------------------------------------------------------
+      # Registry auth
+      # ---------------------------------------------------------------------
+
+      # actions/setup-node writes
+      #   //registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}
+      # into the .npmrc whenever registry-url is set. On the trusted-publishing
+      # path NODE_AUTH_TOKEN is unset, so npm reads an EMPTY auth token,
+      # concludes credentials are already configured, never starts the OIDC
+      # exchange, and sends an unauthenticated PUT. The registry answers
+      # "404 ... could not be found or you do not have permission" — identical
+      # to the response for a package that does not exist yet.
+      #
+      # Dropping registry-url instead does NOT work: with no userconfig at all
+      # npm fails earlier with ENEEDAUTH, still without attempting the
+      # exchange. The registry entry must exist and the token line must not.
+      # https://github.com/actions/setup-node/issues/1551
+      - name: Strip the _authToken line setup-node writes
+        run: |
+          npmrc="${NPM_CONFIG_USERCONFIG:-$HOME/.npmrc}"
+          if [ -f "$npmrc" ]; then
+            sed -i '/_authToken/d' "$npmrc"
+            echo "--- .npmrc after stripping ---"
+            cat "$npmrc"
+          else
+            echo "No .npmrc at $npmrc"
+          fi
+
+      # Pin the major. `npm@latest` in a release job means the release job is
+      # the first place a new npm major ever runs — npm 12 changed the shape of
+      # `npm pack --json`, which broke the packaging test in exactly the way
+      # that test exists to detect.
+      - name: Pin npm
+        run: |
+          npm install -g npm@11
+          npm --version
+
+      # ---------------------------------------------------------------------
+      # Build and verify what is about to be published
+      # ---------------------------------------------------------------------
+
+      # NODE_ENV is honoured by `npm ci`; a production value silently omits
+      # devDependencies and every step below then fails for the wrong reason.
+      - name: Install
+        run: npm ci
+        env:
+          NODE_ENV: development
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Format check
+        run: npm run format:check
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Smoke test the built binary
+        run: |
+          node dist/index.js --version
+          node dist/index.js --list-tools > /dev/null
+
+      # The only cheap place to catch a bad tarball. A version number on npm
+      # can never be reused, so a broken publish costs a version bump.
+      - name: Publish dry run
+        run: npm publish --dry-run --access public
+
+      # ---------------------------------------------------------------------
+      # Publish — exactly one of these two runs
+      # ---------------------------------------------------------------------
+
+      # Provenance must be requested explicitly when publishing with a token.
+      - name: Publish (granular token)
+        if: env.HAS_NPM_TOKEN == 'true'
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      # No --provenance here: it is generated automatically under trusted
+      # publishing, and passing it explicitly is not the supported path.
+      - name: Publish (trusted publishing)
+        if: env.HAS_NPM_TOKEN != 'true'
+        run: npm publish --access public
+
+      # ---------------------------------------------------------------------
+      # Failure guidance
+      # ---------------------------------------------------------------------
+
+      # The two most likely failures produce an IDENTICAL 404 and have opposite
+      # fixes. Saying so here is the difference between a ten-minute fix and
+      # the six-run debugging session this workflow is derived from.
+      - name: Explain a publish failure
+        if: failure()
+        run: |
+          echo "::group::Diagnosing the failure"
+          if [ "$HAS_NPM_TOKEN" = "true" ]; then
+            cat <<'EOF'
+          This run used the GRANULAR TOKEN path (the NPM_TOKEN secret is set).
+
+          A 404 "could not be found or you do not have permission" here almost
+          always means the token is wrong, not that the package is missing:
+
+            * the token is expired, revoked, or was pasted with whitespace;
+            * the token is scoped to a different package or to read-only;
+            * the token's owner is not a member of the @zenixsolutions org.
+
+          If the publish SUCCEEDED and the package still 404s for everyone,
+          the package is private, not missing. A granular token cannot set
+          visibility on a package it is creating, so --access public was
+          ignored and the package inherited the org default. Confirm with:
+
+            curl -s https://registry.npmjs.org/-/org/zenixsolutions/package
+
+          If the name is listed there and the public URL 404s, flip it to
+          public in the package settings. See docs/releasing.md.
+          EOF
+          else
+            cat <<'EOF'
+          This run used the TRUSTED PUBLISHING path (no NPM_TOKEN secret).
+
+          A 404 "could not be found or you do not have permission", or an
+          ENEEDAUTH, has two causes that look identical from here:
+
+          1. THE PACKAGE DOES NOT EXIST YET.
+             Trusted publishing cannot perform a package's first publish — the
+             publisher is configured on the package's settings page, which does
+             not exist until the package does. Fix: add an NPM_TOKEN secret
+             (granular, scoped to this package, read+write), re-run, then
+             follow docs/releasing.md to flip the package public, configure the
+             trusted publisher, delete the secret.
+
+             Check which case you are in:
+               curl -s https://registry.npmjs.org/-/org/zenixsolutions/package
+             Package NOT listed -> case 1. Listed -> case 2.
+
+          2. THE TRUSTED PUBLISHER ENTRY DOES NOT MATCH THIS WORKFLOW.
+             A mismatch produces a silent no-attempt, not a descriptive error.
+             Compare the entry on npmjs.com character by character against:
+
+               organization or user : ZenixSolutions
+               repository           : netbox-mcp-server
+               workflow filename    : release.yml
+               environment          : (must be empty — this job declares none)
+
+             Note the workflow field wants the bare filename, not the path.
+
+          Also confirm from the log above that the .npmrc printed by the
+          "Strip the _authToken line" step contains registry-url and NO
+          _authToken line. If a token line is present, OIDC was never
+          attempted and the 404 is a red herring.
+          EOF
+          fi
+          echo "::endgroup::"
