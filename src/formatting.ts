@@ -28,13 +28,35 @@ export function displayRef(value: unknown): string | undefined {
   return undefined;
 }
 
+/**
+ * Coerce an arbitrary NetBox field into something safe to interpolate.
+ *
+ * Template literals over `unknown` silently produce "[object Object]", which
+ * reaches the model as if it were data. Every label in a response goes through
+ * here instead.
+ */
+export function toDisplayString(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  if (typeof value === "string") return value;
+  if (
+    typeof value === "number" ||
+    typeof value === "boolean" ||
+    typeof value === "bigint"
+  ) {
+    return String(value);
+  }
+  return displayRef(value) ?? "[object]";
+}
+
 /** Render a NetBox row as a concise Markdown heading + bullet list. */
 export function renderObjectMarkdown(
   obj: Record<string, unknown>,
-  opts: { title?: string; fields?: string[] } = {},
+  opts: { title?: string | undefined; fields?: string[] | undefined } = {},
 ): string {
-  const id = obj.id;
-  const display = obj.display ?? obj.name ?? obj.slug ?? obj.address ?? obj.prefix ?? `#${id}`;
+  const id = toDisplayString(obj.id);
+  const display = toDisplayString(
+    obj.display ?? obj.name ?? obj.slug ?? obj.address ?? obj.prefix ?? `#${id}`,
+  );
   const title = opts.title ?? `${display} (id=${id})`;
 
   const lines: string[] = [`## ${title}`];
@@ -58,7 +80,7 @@ export function renderListMarkdown(
     title: string;
     total: number;
     offset: number;
-    fields?: string[];
+    fields?: string[] | undefined;
   },
 ): string {
   const lines: string[] = [
@@ -92,12 +114,12 @@ function renderValue(val: unknown): string | undefined {
     const ref = displayRef(val);
     if (ref) {
       const id = (val as Record<string, unknown>).id;
-      return id !== undefined ? `${ref} (id=${id})` : ref;
+      return id !== undefined ? `${ref} (id=${toDisplayString(id)})` : ref;
     }
     // Don't dump full nested objects into bullet lists — use JSON format for that.
     return "[object]";
   }
-  return String(val);
+  return toDisplayString(val);
 }
 
 export interface ListPayload<T> {

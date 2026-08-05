@@ -9,7 +9,7 @@
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
-import { z, ZodRawShape, ZodTypeAny } from "zod";
+import { z, ZodRawShape } from "zod";
 
 import { getClient } from "./client.js";
 import { isReadOnly } from "./gating.js";
@@ -21,6 +21,7 @@ import {
   renderListMarkdown,
   renderObjectMarkdown,
   ResponseFormat,
+  toDisplayString,
 } from "./formatting.js";
 import {
   CommonListFilters,
@@ -39,9 +40,9 @@ interface ResourceDescriptor {
   /** Short description used in list/get tool descriptions. */
   description: string;
   /** Fields to surface in the Markdown listing. Optional. */
-  listFields?: string[];
+  listFields?: string[] | undefined;
   /** Fields to surface in the Markdown detail view. Optional. */
-  detailFields?: string[];
+  detailFields?: string[] | undefined;
 }
 
 /**
@@ -122,15 +123,12 @@ Returns:
           tag?: string[];
           [k: string]: unknown;
         };
-        const data = await getClient().list<Record<string, unknown>>(
-          resource.endpoint,
-          {
-            ...rest,
-            tag,
-            limit,
-            offset,
-          },
-        );
+        const data = await getClient().list<Record<string, unknown>>(resource.endpoint, {
+          ...rest,
+          tag,
+          limit,
+          offset,
+        });
         const payload = buildListPayload<Record<string, unknown>>(
           data.results,
           data.count,
@@ -174,10 +172,7 @@ Returns:
         const id = args.id as number;
         const response_format = (args.response_format ??
           ResponseFormat.MARKDOWN) as ResponseFormat;
-        const obj = await getClient().get<Record<string, unknown>>(
-          resource.endpoint,
-          id,
-        );
+        const obj = await getClient().get<Record<string, unknown>>(resource.endpoint, id);
         return formatDetailResult(obj, response_format, resource);
       } catch (error) {
         return asError(handleApiError(error));
@@ -367,7 +362,10 @@ Returns a confirmation on success (NetBox replies HTTP 204 No Content).`;
         await getClient().del(resource.endpoint, id);
         return {
           content: [
-            { type: "text" as const, text: `Deleted ${resource.singular} id ${id} from NetBox.` },
+            {
+              type: "text" as const,
+              text: `Deleted ${resource.singular} id ${id} from NetBox.`,
+            },
           ],
         };
       } catch (error) {
@@ -406,7 +404,9 @@ function formatListResult(
       };
       const note = `// Response truncated from ${payload.items.length} to ${half} items. Re-call with offset=${trimmed.next_offset}.\n`;
       return {
-        content: [{ type: "text" as const, text: note + JSON.stringify(trimmed, null, 2) }],
+        content: [
+          { type: "text" as const, text: note + JSON.stringify(trimmed, null, 2) },
+        ],
         structuredContent: trimmed as unknown as Record<string, unknown>,
       };
     }
@@ -440,17 +440,18 @@ function formatDetailResult(
       structuredContent: obj,
     };
   }
-  const name =
+  const name = toDisplayString(
     obj.display ??
-    obj.name ??
-    obj.slug ??
-    obj.address ??
-    obj.prefix ??
-    `#${obj.id}`;
+      obj.name ??
+      obj.slug ??
+      obj.address ??
+      obj.prefix ??
+      `#${toDisplayString(obj.id)}`,
+  );
   const title =
     (opts.titlePrefix
       ? `${opts.titlePrefix} ${resource.singular}: `
-      : `${capitalize(resource.singular)}: `) + String(name);
+      : `${capitalize(resource.singular)}: `) + name;
   const text = renderObjectMarkdown(obj, {
     title,
     fields: resource.detailFields,
@@ -468,7 +469,6 @@ function asError(text: string): CallToolResult {
   };
 }
 
-
 /**
  * Map bridge-safe argument names back to the NetBox API field names before a
  * write. The Anthropic remote-devices bridge reserves the top-level argument
@@ -485,14 +485,15 @@ function remapReservedArgs(body: Record<string, unknown>): void {
 }
 
 function capitalize(s: string): string {
-  if (!s) return s;
-  return s[0].toUpperCase() + s.slice(1);
+  const first = s[0];
+  if (first === undefined) return s;
+  return first.toUpperCase() + s.slice(1);
 }
 
 function renderFilterDocs(shape: ZodRawShape): string {
   const lines: string[] = [];
   for (const [name, schema] of Object.entries(shape)) {
-    const desc = (schema as ZodTypeAny).description ?? "";
+    const desc = schema.description ?? "";
     lines.push(`  - ${name}: ${desc}`);
   }
   return lines.join("\n");

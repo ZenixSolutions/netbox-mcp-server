@@ -1,0 +1,32 @@
+name: Feature request
+description: Propose a capability this server does not have.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: >
+        Describe the task, not the implementation. What were you asking an
+        assistant to do when this server came up short?
+    validations:
+      required: true
+
+  - type: textarea
+    id: endpoints
+    attributes:
+      label: Which NetBox API surface does this need?
+      description: >
+        Endpoints, object types, or plugin. Only officially documented API
+        surface is in scope — undocumented behaviour is reported upstream,
+        not built against.
+    validations:
+      required: false
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What did you try instead?
+      description: Existing tools you used, and where they fell short.
+    validations:
+      required: false

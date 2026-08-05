@@ -1,0 +1,62 @@
+name: Bug report
+description: Something behaves differently from what the documentation says.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please do not paste a NetBox token, or any output that contains one.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What did you observe, and what did you expect instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: >
+        The tool call and arguments, or the shell command. Exact input beats a
+        description of the input.
+    validations:
+      required: true
+
+  - type: input
+    id: server-version
+    attributes:
+      label: Server version
+      description: Output of `npx @zenixsolutions/netbox-mcp --version`.
+    validations:
+      required: true
+
+  - type: input
+    id: netbox-version
+    attributes:
+      label: NetBox version
+      description: >
+        From `/api/status/` or the footer of the NetBox UI. Response shapes
+        differ across NetBox versions, so this is usually load-bearing.
+    validations:
+      required: true
+
+  - type: input
+    id: client
+    attributes:
+      label: MCP client
+      description: Claude Desktop, Claude Code, Cursor, Codex, …
+    validations:
+      required: false
+
+  - type: textarea
+    id: plugins
+    attributes:
+      label: NetBox plugins installed
+      description: >
+        The tool surface is derived from your instance's own schema, so
+        plugins change it.
+    validations:
+      required: false

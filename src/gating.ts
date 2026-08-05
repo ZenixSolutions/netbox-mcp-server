@@ -11,6 +11,35 @@
 
 import { ENV_NETBOX_READONLY, ENV_NETBOX_TOOL_GROUPS } from "./constants.js";
 
+/**
+ * Registration-time environment.
+ *
+ * The registrars in `registrars.ts` decide whether to register a write tool by
+ * calling `isReadOnly()` with no argument, from deep inside a call tree that
+ * has no environment to thread. Reading `process.env` there directly made the
+ * gate untestable — and a control that cannot be tested is a control that is
+ * assumed, which Article VIII does not allow.
+ *
+ * `withEnv` scopes an environment for the duration of a synchronous
+ * registration pass. It is not a general-purpose ambient context: nothing
+ * asynchronous may run inside the callback.
+ */
+let envOverride: NodeJS.ProcessEnv | undefined;
+
+export function withEnv<T>(env: NodeJS.ProcessEnv, fn: () => T): T {
+  const previous = envOverride;
+  envOverride = env;
+  try {
+    return fn();
+  } finally {
+    envOverride = previous;
+  }
+}
+
+function currentEnv(env?: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  return env ?? envOverride ?? process.env;
+}
+
 /** Every tool group name understood by NETBOX_TOOL_GROUPS. */
 export const ALL_TOOL_GROUPS = [
   "search",
@@ -36,8 +65,8 @@ function parseBool(value: string | undefined): boolean {
 }
 
 /** True when NETBOX_READONLY is set to a truthy value. */
-export function isReadOnly(env: NodeJS.ProcessEnv = process.env): boolean {
-  return parseBool(env[ENV_NETBOX_READONLY]);
+export function isReadOnly(env?: NodeJS.ProcessEnv): boolean {
+  return parseBool(currentEnv(env)[ENV_NETBOX_READONLY]);
 }
 
 /**
@@ -45,8 +74,8 @@ export function isReadOnly(env: NodeJS.ProcessEnv = process.env): boolean {
  * Unknown names are ignored with a warning on stderr rather than crashing, so
  * a typo in a client config degrades instead of breaking the server.
  */
-export function enabledGroups(env: NodeJS.ProcessEnv = process.env): Set<string> {
-  const raw = (env[ENV_NETBOX_TOOL_GROUPS] ?? "").trim();
+export function enabledGroups(env?: NodeJS.ProcessEnv): Set<string> {
+  const raw = (currentEnv(env)[ENV_NETBOX_TOOL_GROUPS] ?? "").trim();
   if (!raw) return new Set(ALL_TOOL_GROUPS);
 
   const requested = raw

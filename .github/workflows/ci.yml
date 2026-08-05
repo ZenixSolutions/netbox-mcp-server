@@ -1,0 +1,80 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: validate (node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ["20", "22"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      # NODE_ENV is honoured by `npm ci`; a production value silently omits
+      # devDependencies and every step below then fails for the wrong reason.
+      - name: Install
+        run: npm ci
+        env:
+          NODE_ENV: development
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Format check
+        run: npm run format:check
+
+      - name: Test
+        run: npm run test -- --coverage
+
+      - name: Build
+        run: npm run build
+
+      # The published package is the contract. Verify the CLI contract against
+      # the built artifact, not the source tree.
+      - name: Smoke test the built binary
+        run: |
+          node dist/index.js --version
+          node dist/index.js --list-tools > /dev/null
+          set +e
+          node dist/index.js --check
+          code=$?
+          set -e
+          if [ "$code" -ne 78 ]; then
+            echo "::error::--check must exit 78 with no configuration, got $code"
+            exit 1
+          fi
+
+  secrets:
+    name: secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

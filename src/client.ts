@@ -83,10 +83,7 @@ export class NetBoxClient {
     id: number | string,
     body: Record<string, unknown>,
   ): Promise<T> {
-    const response = await this.http.patch(
-      `/${endpoint}/${id}/`,
-      cleanParams(body),
-    );
+    const response = await this.http.patch(`/${endpoint}/${id}/`, cleanParams(body));
     if (response.status >= 400) {
       throw axiosLikeError(response);
     }
@@ -102,10 +99,7 @@ export class NetBoxClient {
   }
 
   /** GET /<path>/ with raw query params. Used for global search. */
-  async raw<T>(
-    path: string,
-    params: Record<string, unknown> = {},
-  ): Promise<T> {
+  async raw<T>(path: string, params: Record<string, unknown> = {}): Promise<T> {
     const response = await this.http.get(path.startsWith("/") ? path : `/${path}`, {
       params: cleanParams(params),
     });
@@ -121,9 +115,7 @@ export class NetBoxClient {
  * preserved so Axios repeats them (e.g. ?tag=foo&tag=bar) — NetBox expects
  * this for multi-value filters.
  */
-function cleanParams(
-  params: Record<string, unknown>,
-): Record<string, unknown> {
+function cleanParams(params: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(params)) {
     if (v === undefined || v === null) continue;

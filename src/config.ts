@@ -9,11 +9,7 @@
  *   NETBOX_INSECURE - "1"/"true"/"yes" to skip TLS verification
  */
 
-import {
-  ENV_NETBOX_INSECURE,
-  ENV_NETBOX_TOKEN,
-  ENV_NETBOX_URL,
-} from "./constants.js";
+import { ENV_NETBOX_INSECURE, ENV_NETBOX_TOKEN, ENV_NETBOX_URL } from "./constants.js";
 
 export interface NetBoxConfig {
   /** Fully qualified base URL, no trailing slash. */

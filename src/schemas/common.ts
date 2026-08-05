@@ -31,7 +31,9 @@ export const PaginationSchema = z.object({
     .int()
     .min(0)
     .default(0)
-    .describe("Number of items to skip for pagination. Use next_offset from a previous response."),
+    .describe(
+      "Number of items to skip for pagination. Use next_offset from a previous response.",
+    ),
 });
 
 /** Generic filter fields shared by most NetBox list endpoints. */
@@ -51,7 +53,9 @@ export const CommonListFilters = z.object({
   created_after: z
     .string()
     .optional()
-    .describe("ISO-8601 date; only return objects created on or after this date (e.g. 2024-01-01)."),
+    .describe(
+      "ISO-8601 date; only return objects created on or after this date (e.g. 2024-01-01).",
+    ),
   created_before: z
     .string()
     .optional()
