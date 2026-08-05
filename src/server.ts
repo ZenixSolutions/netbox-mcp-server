@@ -13,20 +13,10 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 
-import { enabledGroups, withEnv } from "./gating.js";
-import { registerCircuits } from "./tools/circuits.js";
-import { registerDcim } from "./tools/dcim.js";
-import { registerDcimComponents } from "./tools/dcim_components.js";
-import { registerDcimOrg } from "./tools/dcim_org.js";
-import { registerDeletes } from "./tools/deletes.js";
-import { registerInventory } from "./tools/inventory.js";
-import { registerIpam } from "./tools/ipam.js";
-import { registerIpamOrg } from "./tools/ipam_org.js";
-import { registerIpamServices } from "./tools/ipam_services.js";
-import { registerPower } from "./tools/power.js";
-import { registerSearch } from "./tools/search.js";
-import { registerTenancy } from "./tools/tenancy.js";
-import { registerVirtualization } from "./tools/virtualization.js";
+import { loadConfig } from "./config.js";
+import { createSchemaProviderForConfig } from "./schema/index.js";
+import type { SchemaProvider } from "./schema/types.js";
+import { registerLayeredTools } from "./tools/layered/index.js";
 
 export const SERVER_NAME = "netbox-mcp-server";
 
@@ -40,38 +30,60 @@ export const SERVER_VERSION: string = (() => {
   return typeof pkg.version === "string" ? pkg.version : "0.0.0-unknown";
 })();
 
-const REGISTRARS: [group: string, register: (s: McpServer) => void][] = [
-  ["search", registerSearch],
-  ["dcim", registerDcim],
-  ["ipam", registerIpam],
-  ["inventory", registerInventory],
-  ["power", registerPower],
-  ["dcim_org", registerDcimOrg],
-  ["tenancy", registerTenancy],
-  ["ipam_org", registerIpamOrg],
-  ["dcim_components", registerDcimComponents],
-  ["virtualization", registerVirtualization],
-  ["circuits", registerCircuits],
-  ["ipam_services", registerIpamServices],
-  ["deletes", registerDeletes],
-];
+/**
+ * A provider that fails on use, for the paths that must work with no NetBox
+ * configuration at all — `--list-tools`, and any client that calls
+ * `tools/list` before the user has supplied credentials.
+ *
+ * This is safe only because the five tools are registered statically: their
+ * names, descriptions and input schemas do not depend on the instance. The
+ * schema is consulted when a tool is *called*, never when it is listed. The
+ * surface suite pins that by listing tools through a provider that throws on
+ * every method.
+ */
+function unconfiguredProvider(reason: string): SchemaProvider {
+  const fail = (): never => {
+    throw new Error(reason);
+  };
+  return {
+    version: () => Promise.resolve().then(fail),
+    listObjectTypes: () => Promise.resolve().then(fail),
+    resolve: () => Promise.resolve().then(fail),
+    describe: () => Promise.resolve().then(fail),
+  };
+}
+
+export interface BuildServerOptions {
+  /** Override the schema provider. Tests use this; nothing else should. */
+  schema?: SchemaProvider | undefined;
+}
 
 /**
- * Build a fully registered server. Does not read NetBox configuration — the
- * HTTP client is created lazily on the first tool call — so this is safe to
- * call with no environment set.
+ * Build a fully registered server.
+ *
+ * Does not read NetBox configuration unless it has to, and never contacts the
+ * instance during construction — the schema document is fetched lazily on the
+ * first tool call that needs it. A session that only lists tools pays nothing.
  */
-export function buildServer(env: NodeJS.ProcessEnv = process.env): McpServer {
+export function buildServer(
+  env: NodeJS.ProcessEnv = process.env,
+  options: BuildServerOptions = {},
+): McpServer {
   const server = new McpServer({ name: SERVER_NAME, version: SERVER_VERSION });
-  const groups = enabledGroups(env);
-  // Registration is synchronous, and the registrars consult `isReadOnly()`
-  // with no argument from several levels down. `withEnv` is what makes the
-  // read-only gate observable from a test.
-  withEnv(env, () => {
-    for (const [group, register] of REGISTRARS) {
-      if (groups.has(group)) register(server);
+
+  let schema = options.schema;
+  if (!schema) {
+    try {
+      schema = createSchemaProviderForConfig(loadConfig(env));
+    } catch (err) {
+      schema = unconfiguredProvider(
+        `${err instanceof Error ? err.message : String(err)} ` +
+          "Set NETBOX_URL and NETBOX_TOKEN, then run `netbox-mcp --check` to verify.",
+      );
     }
-  });
+  }
+
+  registerLayeredTools(server, schema);
   return server;
 }
 
@@ -87,8 +99,9 @@ export interface ToolSummary {
  */
 export async function listTools(
   env: NodeJS.ProcessEnv = process.env,
+  options: BuildServerOptions = {},
 ): Promise<ToolSummary[]> {
-  const server = buildServer(env);
+  const server = buildServer(env, options);
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
   const client = new Client({ name: "introspect", version: SERVER_VERSION });
 

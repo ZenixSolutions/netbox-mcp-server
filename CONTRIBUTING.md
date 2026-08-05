@@ -7,12 +7,17 @@ reporting.
 
 ## Getting set up
 
+Node.js >= 20.11 is required (`engines.node` in `package.json`; CI runs 20 and 22).
+
 ```bash
 git clone https://github.com/zenixsolutions/netbox-mcp-server.git
 cd netbox-mcp-server
 npm ci
 npm run build
 ```
+
+Run `npm ci` in a shell with no `NETBOX_TOKEN` exported — it runs the install scripts of
+every package in the dependency tree, and each one inherits your environment.
 
 To iterate:
 
@@ -27,20 +32,19 @@ involving writes, run NetBox locally with Docker rather than pointing at product
 ## Before opening a pull request
 
 ```bash
+npm run typecheck      # tsc --noEmit over sources and tests
+npm run lint           # eslint
+npm run format:check   # prettier --check; `npm run format` fixes
+npm test               # vitest run
 npm run build          # must pass with no TypeScript errors
 npm audit              # should report 0 vulnerabilities
-shellcheck scripts/install.sh
 ```
 
 And confirm the tool surface still registers as expected:
 
 ```bash
-printf '%s\n' \
-  '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"cli","version":"1"}}}' \
-  '{"jsonrpc":"2.0","method":"notifications/initialized"}' \
-  '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}' \
-| NETBOX_URL=https://x.invalid NETBOX_TOKEN=x node dist/index.js 2>/dev/null \
-| tail -1 | python3 -c 'import sys,json; print(len(json.load(sys.stdin)["result"]["tools"]))'
+node dist/index.js --list-tools | wc -l                     # -> 446
+NETBOX_READONLY=1 node dist/index.js --list-tools | wc -l   # -> 179
 ```
 
 If your change alters the tool count, update the numbers in `README.md` and
@@ -60,8 +64,10 @@ Most resources need no new plumbing. In the relevant `src/tools/*.ts`:
    resource gets a delete tool too.
 
 Adding a whole new **group** additionally requires adding its name to `ALL_TOOL_GROUPS`
-in `src/gating.ts` and wiring it in `src/index.ts`. Forgetting the first means
-`NETBOX_TOOL_GROUPS` silently cannot select it.
+in `src/gating.ts` and an entry in the `REGISTRARS` table in `src/server.ts`. Forgetting
+the first means `NETBOX_TOOL_GROUPS` silently cannot select it; forgetting the second
+means the group is never registered. `src/index.ts` is argv parsing only — nothing is
+wired there.
 
 ## Conventions
 
