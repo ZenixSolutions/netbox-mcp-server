@@ -5,7 +5,7 @@
  * config from env at first use and applies the auth header + TLS options.
  */
 
-import axios, { AxiosInstance } from "axios";
+import axios, { AxiosError, AxiosInstance } from "axios";
 import https from "node:https";
 
 import { loadConfig, NetBoxConfig } from "./config.js";
@@ -135,7 +135,7 @@ function axiosLikeError(response: { status: number; data: unknown }): Error {
     `Request failed with status code ${response.status}`,
     String(response.status),
   );
-  err.response = response as any;
+  err.response = response as NonNullable<AxiosError["response"]>;
   return err;
 }
 

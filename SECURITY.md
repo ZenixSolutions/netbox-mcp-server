@@ -58,9 +58,13 @@ reads them may be steered by their contents. If any of your NetBox data originat
 outside your organization, treat write access as high-risk and prefer read-only tokens.
 
 **Tokens live in client config files.** `~/Library/Application Support/Claude/
-claude_desktop_config.json` and its equivalents are plaintext and world-readable by the
-user's own processes. Set an expiry on every token, scope tokens to the office IP range
-if your NetBox deployment supports it, and rotate them when someone leaves.
+claude_desktop_config.json` and its equivalents are plaintext, and are created with the
+default umask — usually world-readable. `chmod 600` them, and delete any `.bak` copy you
+make while editing: a backup is a second copy of every token in the file, it inherits the
+original's permissions, and nothing cleans it up. Set an expiry on every token, scope
+tokens to the office IP range if your NetBox deployment supports it, and rotate them when
+someone leaves — and remember that rotating a token does not help if an old copy of the
+config still holds the previous one.
 
 **`NETBOX_INSECURE=1` disables TLS certificate validation entirely**, which exposes the
 token to anyone able to intercept the connection. Prefer installing your internal root CA
@@ -68,5 +72,7 @@ into the system trust store.
 
 ## Supported versions
 
-Fixes land on `main`. There is no long-term support branch — pull the latest commit and
-rebuild.
+Fixes land on `main` and go out in the next release. There is no long-term support
+branch: upgrade to the latest published version of `@zenixsolutions/netbox-mcp` (or, if
+you run from a clone, pull `main` and rebuild). If your client config pins a version,
+bump the pin — a pinned `npx` invocation never picks up a fix on its own.

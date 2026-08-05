@@ -16,36 +16,34 @@ Cursor, Continue.
 > > and follow it to install the NetBox MCP server on my Mac.
 >
 > [`AGENTS.md`](AGENTS.md) is a step-by-step runbook written for an AI assistant to
-> execute without guessing — dependency checks, build, client config, and troubleshooting.
-> Humans can use the Quick start below instead.
+> execute without guessing — dependency checks, client config, verification, and
+> troubleshooting. Humans can use the Quick start below instead.
 
 ---
 
 ## Quick start
 
-```bash
-# 1. Clone
-mkdir -p ~/mcp-servers && cd ~/mcp-servers
-git clone https://github.com/zenixsolutions/netbox-mcp-server.git
-cd netbox-mcp-server
+There is nothing to clone, build, or install. Your MCP client launches the server with
+`npx`, which fetches the published package on first use.
 
-# 2. Check dependencies, install, build, smoke-test
-./scripts/install.sh
-```
+You need Node.js **>= 20.11** (`node --version`) and a NetBox API token: **NetBox → your
+user menu → API Tokens → Add a token**. Tick **Read-only** on the token unless you are
+supposed to change infrastructure records, and set an expiry date.
 
-`install.sh` verifies Homebrew, git, and Node >= 18, runs `npm ci && npm run build`,
-confirms the server answers a `tools/list` request, and prints a ready-to-paste client
-config with the correct absolute paths filled in. It never runs `sudo`.
+> The package is not on the npm registry yet — `npx @zenixsolutions/netbox-mcp` returns
+> `404` until the first release is published. Until then, use
+> [Building from a clone](#building-from-a-clone) below.
 
-Then get a NetBox API token (**NetBox → your user menu → API Tokens → Add a token**) and
-add the server to your client:
+**Claude Desktop** — `~/Library/Application Support/Claude/claude_desktop_config.json`
+(macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows). Add the `netbox`
+entry to the `mcpServers` object you already have; do not replace the file:
 
 ```json
 {
   "mcpServers": {
     "netbox": {
-      "command": "/opt/homebrew/bin/node",
-      "args": ["/Users/YOU/mcp-servers/netbox-mcp-server/dist/index.js"],
+      "command": "/opt/homebrew/bin/npx",
+      "args": ["-y", "@zenixsolutions/netbox-mcp"],
       "env": {
         "NETBOX_URL": "https://netbox.yourcompany.com",
         "NETBOX_TOKEN": "your-api-token",
@@ -56,13 +54,57 @@ add the server to your client:
 }
 ```
 
-Claude Desktop reads `~/Library/Application Support/Claude/claude_desktop_config.json`.
-Fully quit (Cmd-Q) and reopen it afterwards. Other clients:
-[`AGENTS.md` § 6](AGENTS.md#6-configure-the-ai-client).
+Use the **absolute** path from `command -v npx` as `command`. Claude Desktop is launched
+from Finder and never sources your shell profile, so a bare `"npx"` — like a bare
+`"node"` — often fails with `spawn npx ENOENT`. Fully quit Claude Desktop (Cmd-Q) and
+reopen it after editing the config.
 
-If you have `NETBOX_URL` and `NETBOX_TOKEN` exported, `./scripts/install.sh
---write-claude-config` will merge the entry in for you (backing up your existing config
-first).
+**Claude Code**:
+
+```bash
+read -rs NETBOX_TOKEN                       # paste the token; nothing is echoed
+claude mcp add netbox \
+  --env NETBOX_URL="https://netbox.yourcompany.com" \
+  --env NETBOX_TOKEN="$NETBOX_TOKEN" \
+  --env NETBOX_READONLY=1 \
+  -- "$(command -v npx)" -y @zenixsolutions/netbox-mcp
+unset NETBOX_TOKEN
+```
+
+Do not put the token in `~/.zshrc` or any other shell profile. It belongs in the client
+config and nowhere else.
+
+Pin the version — `"@zenixsolutions/netbox-mcp@0.1.0"` — if you do not want the tool
+surface to change between restarts; unpinned, `npx` resolves the latest release each time
+its cache misses. Other clients: [`AGENTS.md` § 6](AGENTS.md#6-configure-the-ai-client).
+
+### Building from a clone
+
+For contributors, and for machines that cannot reach the npm registry:
+
+```bash
+git clone https://github.com/zenixsolutions/netbox-mcp-server.git
+cd netbox-mcp-server
+npm ci
+npm run build
+node dist/index.js --check     # exits 0 when NETBOX_URL and NETBOX_TOKEN are usable
+```
+
+Run `npm ci` in a shell with **no** `NETBOX_TOKEN` exported: it executes the install
+scripts of every package in the dependency tree, and each one inherits your environment.
+
+Then use the same client config as above, with `command` set to the absolute path from
+`command -v node` and `args` set to the absolute path of `dist/index.js`:
+
+```json
+"netbox": {
+  "command": "/opt/homebrew/bin/node",
+  "args": ["/Users/YOU/netbox-mcp-server/dist/index.js"],
+  "env": { "NETBOX_URL": "...", "NETBOX_TOKEN": "...", "NETBOX_READONLY": "1" }
+}
+```
+
+Tildes (`~`) are not expanded by MCP clients — both paths must be absolute.
 
 ---
 
@@ -136,38 +178,55 @@ NETBOX_TOOL_GROUPS=search,dcim,dcim_org,dcim_components,ipam,ipam_org,power,tena
 
 ---
 
+## Command-line surface
+
+The binary is normally launched by a client, but it has four verbs for verifying an
+install. Substitute `node dist/index.js` for `netbox-mcp` if you built from a clone.
+
+| Command                   | Does                                                                                                | Exit code                       |
+| ------------------------- | --------------------------------------------------------------------------------------------------- | ------------------------------- |
+| `netbox-mcp --help`       | Prints usage and every environment variable. Reads no configuration.                                | 0                               |
+| `netbox-mcp --version`    | Prints the version, e.g. `0.1.0`.                                                                   | 0                               |
+| `netbox-mcp --check`      | Validates configuration and names the first missing/invalid variable.                               | **0** usable, **78** not usable |
+| `netbox-mcp --list-tools` | Prints every registered tool name to stdout, `N tools registered.` to stderr. Needs no credentials. | 0                               |
+
+`--check` is the verb for diagnosing a configuration problem. `--help` returns before any
+configuration is read, so it prints the same output whether your credentials are correct,
+wrong, or absent — it can never surface a config error.
+
 ## Verifying an install
 
 ```bash
-# Does the server start and register tools?
-printf '%s\n' \
-  '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"cli","version":"1"}}}' \
-  '{"jsonrpc":"2.0","method":"notifications/initialized"}' \
-  '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}' \
-| NETBOX_URL=https://netbox.corp.com NETBOX_TOKEN=... node dist/index.js \
-| tail -1 | python3 -c 'import sys,json; print(len(json.load(sys.stdin)["result"]["tools"]))'
+# Is the configuration usable? Prints the offending variable and exits 78 if not.
+NETBOX_URL=https://netbox.corp.com NETBOX_TOKEN="$NETBOX_TOKEN" netbox-mcp --check
+# -> ok: netbox-mcp-server v0.1.0 configured for https://netbox.corp.com
 
-# Do the credentials work?
+# Does the server register the tools you expect? Needs no credentials.
+netbox-mcp --list-tools | wc -l                      # -> 446
+NETBOX_READONLY=1 netbox-mcp --list-tools | wc -l     # -> 179
+
+# Do the credentials work against NetBox itself?
 curl -sS -H "Authorization: Token $NETBOX_TOKEN" \
   "$NETBOX_URL/api/dcim/sites/?limit=1" | head -c 200
-
-# Interactive exploration — starts a local web server and runs until Ctrl-C
-npx @modelcontextprotocol/inspector node dist/index.js
 ```
 
-Then ask your assistant: _"Using the netbox tools, list the first 5 sites."_
+Keep the token in a shell variable rather than typing it into a command: command lines
+land in shell history and are visible in `ps` to every process on the machine.
 
-`./scripts/install.sh --check` re-runs just the dependency checks at any time.
+Then ask your assistant: _"Using the netbox tools, list the first 5 sites."_
 
 ---
 
 ## Troubleshooting
 
-The most common failure by far: **`spawn node ENOENT` in a GUI client**. Claude Desktop
-and ChatGPT are launched from Finder and never source your `~/.zshrc`, so a `node`
-installed by nvm/fnm/asdf/Volta is invisible to them. Use the absolute path from
-`which node` in the config, not the bare string `"node"`. `install.sh` detects this and
-fills in the absolute path for you.
+The most common failure by far: **`spawn npx ENOENT` / `spawn node ENOENT` in a GUI
+client**. Claude Desktop and ChatGPT are launched from Finder and never source your
+`~/.zshrc`, so an `npx` or `node` installed by nvm/fnm/asdf/Volta/Homebrew is invisible
+to them. Put the absolute path from `command -v npx` (or `command -v node`) in the
+config, not the bare string `"npx"`.
+
+Second most common: **`Missing required environment variable ...`**. Run `--check` with
+the same variables the config sets — it names the variable and exits 78.
 
 Claude Desktop logs each server separately:
 
@@ -182,14 +241,19 @@ Full table of symptoms and fixes: [`AGENTS.md` § 8](AGENTS.md#8-troubleshooting
 ## Development
 
 ```bash
-npm run dev     # tsx watch src/index.ts
-npm run build   # tsc -> dist/
+npm run dev          # tsx watch src/index.ts
+npm run build        # tsc -> dist/
+npm run typecheck    # tsc --noEmit, sources + tests
+npm run lint         # eslint
+npm run format:check # prettier --check
+npm test             # vitest run
 npm run clean
 ```
 
 ```
 src/
-  index.ts            entry point; registers tool groups
+  index.ts            entry point; argv parsing (--help/--version/--check/--list-tools)
+  server.ts           server construction, tool-group registrars, introspection
   constants.ts        character limits, env var names
   config.ts           env parsing / validation
   gating.ts           NETBOX_READONLY + NETBOX_TOOL_GROUPS
@@ -200,12 +264,12 @@ src/
   schemas/common.ts   shared Zod schemas
   tools/              per-domain resource registrations
 scripts/
-  install.sh          macOS dependency check, build, config generator
+  check-changelog.mjs release guard: CHANGELOG has a section for the current version
 ```
 
 Adding a resource means adding a descriptor + schemas in the relevant `tools/*.ts` file;
 the registrars generate the five tools. New groups must also be added to
-`ALL_TOOL_GROUPS` in `src/gating.ts` and wired in `src/index.ts`.
+`ALL_TOOL_GROUPS` in `src/gating.ts` and to the `REGISTRARS` table in `src/server.ts`.
 
 ---
 

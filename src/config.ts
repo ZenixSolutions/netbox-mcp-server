@@ -55,8 +55,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): NetBoxConfig {
 
   try {
     // Validate URL shape.
-    // eslint-disable-next-line no-new
-    new URL(baseUrl);
+    void new URL(baseUrl);
   } catch {
     throw new Error(
       `${ENV_NETBOX_URL} is not a valid URL: "${rawUrl}". ` +

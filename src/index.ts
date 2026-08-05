@@ -14,7 +14,6 @@
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 
 import { loadConfig } from "./config.js";
-import { ALL_TOOL_GROUPS } from "./gating.js";
 import { buildServer, listTools, SERVER_NAME, SERVER_VERSION } from "./server.js";
 
 const EX_CONFIG = 78;
@@ -39,9 +38,11 @@ const HELP = [
   "  NETBOX_INSECURE     Set to 1/true/yes to disable TLS certificate verification.",
   "                      This exposes the token to anyone able to intercept the",
   "                      connection. Prefer installing your internal root CA.",
-  "  NETBOX_READONLY     Set to 1/true/yes to register only list/get/search tools.",
-  "  NETBOX_TOOL_GROUPS  Comma-separated allowlist of tool groups to register.",
-  `                      Unset = all. Valid: ${ALL_TOOL_GROUPS.join(", ")}`,
+  "",
+  "Write access is controlled by the NetBox token, not by this server. Create",
+  "the token with 'write enabled' unchecked, and constrain its object",
+  "permissions, if the assistant should not be able to change anything. That",
+  "is enforced by NetBox, where no tool argument can reach it.",
   "",
   "Transport: stdio only. This binary is launched as a subprocess by an",
   "MCP-aware client (Claude Desktop, Claude Code, Cursor, Codex, ...).",
