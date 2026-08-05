@@ -1,12 +1,12 @@
 # RFC-003: NetBox MCP Server — Engineering OS Adoption and a Layered Tool Surface
 
-- **Status:** Proposed — awaiting Project Owner decision
+- **Status:** **Approved** by the Project Owner, 2026-08-05
 - **Author:** Claude (acting as Repository Architect / API-MCP Architect / Security Engineer per `ACTIVATION_MATRIX.md`)
 - **Date:** 2026-08-05
 - **Repository:** `ZenixSolutions/netbox-mcp-server` (public, MIT, one squashed commit `c4a3944`)
 - **Related:** `RFC-001` (Lumics MCP foundation), `claude/hudu-mcp-build-status.md`, `claude/hudu-mcp-release-playbook.md`, `bootstrap/issues/008-first-external-adoption.md`
-- **Reviewers:** Pending — Chief Architect, Security Engineer, Devil's Advocate
-- **Owner decision:** Pending
+- **Reviewers:** See "Recorded exception — independent review" below
+- **Owner decision:** Approved 2026-08-05. D1–D8 adopted; all open questions resolved.
 
 ---
 
@@ -22,15 +22,15 @@ This RFC proposes replacing the one-tool-per-operation surface with the **layere
 
 Four decisions have already been made by the Project Owner and are recorded here as approved inputs, not open questions:
 
-| Decision | Owner selection |
-|---|---|
-| Scope | Full Engineering OS adoption, same path Hudu took |
-| API coverage | The whole NetBox API, restructured into layers |
-| Write safety | No environment gates — the NetBox API token decides |
-| Distribution | Public repo under `ZenixSolutions`, npm, per the release playbook |
-| Ergonomic shortcuts | Keep a global-search tool alongside the layers |
-| Schema source | Fetch the live instance's `/api/schema/` at runtime |
-| Identity | Reset to `0.1.0`, publish as `@zenixsolutions/netbox-mcp` |
+| Decision            | Owner selection                                                   |
+| ------------------- | ----------------------------------------------------------------- |
+| Scope               | Full Engineering OS adoption, same path Hudu took                 |
+| API coverage        | The whole NetBox API, restructured into layers                    |
+| Write safety        | No environment gates — the NetBox API token decides               |
+| Distribution        | Public repo under `ZenixSolutions`, npm, per the release playbook |
+| Ergonomic shortcuts | Keep a global-search tool alongside the layers                    |
+| Schema source       | Fetch the live instance's `/api/schema/` at runtime               |
+| Identity            | Reset to `0.1.0`, publish as `@zenixsolutions/netbox-mcp`         |
 
 ---
 
@@ -57,7 +57,7 @@ Three things are wrong at once, and only the first is unusual.
 ## Non-Goals
 
 - Remote HTTP transport. stdio for `0.1.0`, matching Hudu; ChatGPT and Grok connectors remain out of reach and this must be stated honestly in `docs/compatibility.md`.
-- Environment-variable write gating. Owner decision: the NetBox token's `write_enabled` flag and object permissions are the control, and they are enforced upstream where an agent cannot reach them. This is a *stronger* posture than Hudu's env gates, not a weaker one — but it makes the token-scoping guidance in the README load-bearing.
+- Environment-variable write gating. Owner decision: the NetBox token's `write_enabled` flag and object permissions are the control, and they are enforced upstream where an agent cannot reach them. This is a _stronger_ posture than Hudu's env gates, not a weaker one — but it makes the token-scoping guidance in the README load-bearing.
 - Undocumented API surface. `CONSTITUTION.md` Article IV.
 
 ---
@@ -66,10 +66,10 @@ Three things are wrong at once, and only the first is unusual.
 
 **Measured**, by building the repository and completing a real MCP `initialize` + `tools/list` handshake over stdio:
 
-| Configuration | Tools | `tools/list` size |
-|---|---:|---:|
-| Default | 446 | 720,863 chars ≈ 180,000 tokens |
-| `NETBOX_READONLY=1` | 179 | 329,306 chars ≈ 82,000 tokens |
+| Configuration       | Tools |              `tools/list` size |
+| ------------------- | ----: | -----------------------------: |
+| Default             |   446 | 720,863 chars ≈ 180,000 tokens |
+| `NETBOX_READONLY=1` |   179 |  329,306 chars ≈ 82,000 tokens |
 
 4,953 lines of TypeScript across 22 files. `tsc` passes. 153 registrar calls across 13 tool modules generate the surface from a shared factory in `src/registrars.ts` — the code is not badly written, it is correctly written against a design that does not scale.
 
@@ -77,32 +77,32 @@ Three things are wrong at once, and only the first is unusual.
 
 **Architecture**
 
-| # | Finding | Consequence |
-|---|---|---|
-| A1 | 446 tools, ~180k tokens of `tools/list` | Server cannot be loaded alongside any real workload |
-| A2 | `main` and `bin` both point at `dist/index.js`, which has a shebang and calls `main()` as an import side effect | Importing the package starts a stdio server. Untestable in-process. Violates RFC-001 D2 |
-| A3 | `SERVER_VERSION` hardcoded in `src/index.ts`, duplicated from `package.json` | Version drift between what npm says and what the server reports |
-| A4 | `server.registerTool` cast to `(...a: unknown[]) => unknown`, every handler takes `args: any` | SDK typing defeated repository-wide; Zod shapes are not connected to handler types |
-| A5 | Node ≥18 (EOL), axios rather than native `fetch` | Diverges from RFC-001 D1 with no recorded exception |
+| #   | Finding                                                                                                         | Consequence                                                                             |
+| --- | --------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| A1  | 446 tools, ~180k tokens of `tools/list`                                                                         | Server cannot be loaded alongside any real workload                                     |
+| A2  | `main` and `bin` both point at `dist/index.js`, which has a shebang and calls `main()` as an import side effect | Importing the package starts a stdio server. Untestable in-process. Violates RFC-001 D2 |
+| A3  | `SERVER_VERSION` hardcoded in `src/index.ts`, duplicated from `package.json`                                    | Version drift between what npm says and what the server reports                         |
+| A4  | `server.registerTool` cast to `(...a: unknown[]) => unknown`, every handler takes `args: any`                   | SDK typing defeated repository-wide; Zod shapes are not connected to handler types      |
+| A5  | Node ≥18 (EOL), axios rather than native `fetch`                                                                | Diverges from RFC-001 D1 with no recorded exception                                     |
 
 **Security**
 
-| # | Finding | Consequence |
-|---|---|---|
-| S1 | `client.raw()` accepts a caller-supplied path with no confinement to the `/api` prefix | Currently only called internally, so not exploitable today — but it becomes the execution layer's entry point, which is exactly where Hudu's `buildPath` traversal defect lived. Must gain prefix confinement before it is exposed |
-| S2 | `extractNetBoxMessage` iterates every key of an upstream error body and returns it verbatim | Same class as Hudu's "unstripped upstream error bodies". NetBox 400 responses echo submitted values, so anything written into a custom field comes back out |
-| S3 | `NETBOX_INSECURE` disables TLS verification globally, with no warning emitted and no scope limit | Silent MITM exposure. Needs a loud stderr warning, README documentation, and a recorded residual risk |
-| S4 | `loadConfig` validates URL *shape* only — any scheme is accepted, including plain `http:` | Token transmitted in clear text with no warning |
-| S5 | `scripts/install.sh` is an AI-executable install runbook | Any script an agent is instructed to run needs security review before the repository is public |
+| #   | Finding                                                                                          | Consequence                                                                                                                                                                                                                        |
+| --- | ------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| S1  | `client.raw()` accepts a caller-supplied path with no confinement to the `/api` prefix           | Currently only called internally, so not exploitable today — but it becomes the execution layer's entry point, which is exactly where Hudu's `buildPath` traversal defect lived. Must gain prefix confinement before it is exposed |
+| S2  | `extractNetBoxMessage` iterates every key of an upstream error body and returns it verbatim      | Same class as Hudu's "unstripped upstream error bodies". NetBox 400 responses echo submitted values, so anything written into a custom field comes back out                                                                        |
+| S3  | `NETBOX_INSECURE` disables TLS verification globally, with no warning emitted and no scope limit | Silent MITM exposure. Needs a loud stderr warning, README documentation, and a recorded residual risk                                                                                                                              |
+| S4  | `loadConfig` validates URL _shape_ only — any scheme is accepted, including plain `http:`        | Token transmitted in clear text with no warning                                                                                                                                                                                    |
+| S5  | `scripts/install.sh` is an AI-executable install runbook                                         | Any script an agent is instructed to run needs security review before the repository is public                                                                                                                                     |
 
 **Correctness**
 
-| # | Finding | Consequence |
-|---|---|---|
-| C1 | `remapReservedArgs` unconditionally deletes `device_id` and renames it to `device` | A bridge-specific workaround embedded in the core registrar. Tool schemas advertise a field name the API does not have. Silently drops `device_id` when `device` is also present |
-| C2 | Tool input shapes are not `.strict()` except in `search.ts`; unknown args flow into `cleanParams` and out to NetBox | NetBox 400s on undocumented query parameters — the same behaviour Hudu exhibited. A hallucinated filter produces a confusing upstream error instead of a local one |
-| C3 | `validateStatus: (s) => s < 500` treats 3xx as success and casts `response.data` blindly | A redirect to a login page deserialises as a NetBox object |
-| C4 | JSON list truncation uses a hardcoded 25,000-char limit that differs from the Markdown path's limit | Two different budgets for the same response |
+| #   | Finding                                                                                                             | Consequence                                                                                                                                                                      |
+| --- | ------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| C1  | `remapReservedArgs` unconditionally deletes `device_id` and renames it to `device`                                  | A bridge-specific workaround embedded in the core registrar. Tool schemas advertise a field name the API does not have. Silently drops `device_id` when `device` is also present |
+| C2  | Tool input shapes are not `.strict()` except in `search.ts`; unknown args flow into `cleanParams` and out to NetBox | NetBox 400s on undocumented query parameters — the same behaviour Hudu exhibited. A hallucinated filter produces a confusing upstream error instead of a local one               |
+| C3  | `validateStatus: (s) => s < 500` treats 3xx as success and casts `response.data` blindly                            | A redirect to a login page deserialises as a NetBox object                                                                                                                       |
+| C4  | JSON list truncation uses a hardcoded 25,000-char limit that differs from the Markdown path's limit                 | Two different budgets for the same response                                                                                                                                      |
 
 **Repository conformance** — required by `standards/repository-standard.md`, all absent: CODE_OF_CONDUCT, issue templates, PR template, CI validation, dependency policy, branch protection, release tagging policy, CHANGELOG, `docs/` tree, any test at all.
 
@@ -116,11 +116,11 @@ Three things are wrong at once, and only the first is unusual.
 
 Replace 446 tools with **five**, in four layers. Layers 1 and 2 are pure metadata; only layer 3 talks to NetBox with intent.
 
-**Layer 0 — `netbox_global_search`** *(kept, unchanged in spirit)*
+**Layer 0 — `netbox_global_search`** _(kept, unchanged in spirit)_
 
-Answers a different question from the layers: *find an instance*, not *find a type*. Fans a `q` query across the common resources in parallel. Without it, "the switch called sw-core-01" costs a discover → describe → execute round-trip every time.
+Answers a different question from the layers: _find an instance_, not _find a type_. Fans a `q` query across the common resources in parallel. Without it, "the switch called sw-core-01" costs a discover → describe → execute round-trip every time.
 
-**Layer 1 — `netbox_discover`** *(discovery)*
+**Layer 1 — `netbox_discover`** _(discovery)_
 
 ```
 { query?: string, family?: "dcim" | "ipam" | "virtualization" | ... }
@@ -129,9 +129,9 @@ Answers a different question from the layers: *find an instance*, not *find a ty
      summary: "A piece of hardware installed in a rack." }, ...]
 ```
 
-Returns the object-type registry — every type the *connected instance* supports, including plugins, derived from its `/api/schema/` paths. One line per type. The complete registry for a stock NetBox is a few thousand tokens; a `family` or `query` filter keeps a typical call far smaller.
+Returns the object-type registry — every type the _connected instance_ supports, including plugins, derived from its `/api/schema/` paths. One line per type. The complete registry for a stock NetBox is a few thousand tokens; a `family` or `query` filter keeps a typical call far smaller.
 
-**Layer 2 — `netbox_describe`** *(planning)*
+**Layer 2 — `netbox_describe`** _(planning)_
 
 ```
 { object_type: "dcim.device", operation: "create" }
@@ -142,7 +142,7 @@ Returns the object-type registry — every type the *connected instance* support
 
 Generated from the instance's OpenAPI component schemas and filterset parameters. This is the layer that makes the pattern defensible for NetBox specifically: **the API self-describes, so layer 2 is generated rather than hand-maintained, and cannot drift from the instance the way a hand-written tool schema can.** Hudu had no equivalent, which is why Hudu got typed tools and 22 spec defects.
 
-**Layer 3 — `netbox_read` and `netbox_write`** *(execution, split)*
+**Layer 3 — `netbox_read` and `netbox_write`** _(execution, split)_
 
 ```
 netbox_read  { object_type, operation: "list"|"get", id?, filters?, limit?, offset?, response_format? }
@@ -161,7 +161,7 @@ Two tools rather than one, deliberately. MCP tool `annotations` — `readOnlyHin
 
 NetBox cascades deletes. Deleting a site can remove its racks, devices and prefixes. The current `netbox_delete_*` description leans on the model to confirm; a description is not a control.
 
-Proposed: `netbox_write` with `operation: "delete"` requires `confirm` to equal the object's current `display` value, which the caller must have fetched. A mis-targeted id fails locally instead of cascading. *Marked as an open question — it is friction, and the owner may prefer to rely on token permissions alone.*
+Proposed: `netbox_write` with `operation: "delete"` requires `confirm` to equal the object's current `display` value, which the caller must have fetched. A mis-targeted id fails locally instead of cascading. _Marked as an open question — it is friction, and the owner may prefer to rely on token permissions alone._
 
 ### D3 — Schema acquisition
 
@@ -175,15 +175,15 @@ Failure path: if `/api/schema/` is unreachable or restricted, the server degrade
 
 Aligned with RFC-001 D1, correcting the divergences:
 
-| Decision | Proposal | Change from today |
-|---|---|---|
-| Node | ≥ 20 LTS | was ≥18 (EOL) |
-| HTTP | native `fetch` | drops axios |
-| TypeScript | `strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes` | adds the latter two |
-| Lint / format | ESLint flat config + Prettier | none today |
-| Tests | Vitest, HTTP mocked at the transport boundary | none today |
-| Validation | Zod at every tool boundary, `.strict()` everywhere | partially today |
-| Handler typing | no `any`, no cast on `registerTool` | fixes A4 |
+| Decision       | Proposal                                                           | Change from today   |
+| -------------- | ------------------------------------------------------------------ | ------------------- |
+| Node           | ≥ 20 LTS                                                           | was ≥18 (EOL)       |
+| HTTP           | native `fetch`                                                     | drops axios         |
+| TypeScript     | `strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes` | adds the latter two |
+| Lint / format  | ESLint flat config + Prettier                                      | none today          |
+| Tests          | Vitest, HTTP mocked at the transport boundary                      | none today          |
+| Validation     | Zod at every tool boundary, `.strict()` everywhere                 | partially today     |
+| Handler typing | no `any`, no cast on `registerTool`                                | fixes A4            |
 
 ### D5 — Repository layout
 
@@ -211,7 +211,7 @@ CLI verbs matching Hudu, because they are how a published package gets verified:
 - S3: `NETBOX_INSECURE` emits a warning on every start and is documented as a residual risk.
 - S4: warn on `http:`, refuse non-`http(s)` schemes.
 - S5: `scripts/install.sh` reviewed before publication, or deleted — `npx` makes it largely redundant.
-- Token guidance is now load-bearing: the README must show how to create a NetBox token with `write_enabled=false` and a constrained object-permission set, because that is the *only* write control.
+- Token guidance is now load-bearing: the README must show how to create a NetBox token with `write_enabled=false` and a constrained object-permission set, because that is the _only_ write control.
 
 ### D7 — Testing
 
@@ -231,13 +231,13 @@ README must carry a prominent disclaimer of non-affiliation with NetBox Labs.
 
 ## Alternatives Considered
 
-**Keep the typed tools, ship subsets via `NETBOX_TOOL_GROUPS`.** *Rejected.* The mechanism exists today and does not work: the smallest useful combination is still tens of thousands of tokens, the user must know which groups they need before they know what they want to do, and a task spanning DCIM and IPAM needs both. It converts a hard failure into a configuration burden.
+**Keep the typed tools, ship subsets via `NETBOX_TOOL_GROUPS`.** _Rejected._ The mechanism exists today and does not work: the smallest useful combination is still tens of thousands of tokens, the user must know which groups they need before they know what they want to do, and a task spanning DCIM and IPAM needs both. It converts a hard failure into a configuration burden.
 
-**Prune to the ~80 most useful tools, Hudu-style.** *Rejected on owner instruction* (full API coverage), and it would be a worse fit regardless: NetBox's value is precisely the long tail of object types, and any hand-chosen 80 becomes a maintenance argument with every user.
+**Prune to the ~80 most useful tools, Hudu-style.** _Rejected on owner instruction_ (full API coverage), and it would be a worse fit regardless: NetBox's value is precisely the long tail of object types, and any hand-chosen 80 becomes a maintenance argument with every user.
 
-**A single `netbox_execute` tool.** *Rejected* on annotation fidelity — see D1.
+**A single `netbox_execute` tool.** _Rejected_ on annotation fidelity — see D1.
 
-**Repair in place, incrementally.** *Partially adopted.* `src/registrars.ts`, `formatting.ts` and `errors.ts` carry real, reusable work and should be refactored rather than rewritten. The tool modules are generated surface and should be replaced by the registry.
+**Repair in place, incrementally.** _Partially adopted._ `src/registrars.ts`, `formatting.ts` and `errors.ts` carry real, reusable work and should be refactored rather than rewritten. The tool modules are generated surface and should be replaced by the registry.
 
 ---
 
@@ -245,13 +245,13 @@ README must carry a prominent disclaimer of non-affiliation with NetBox Labs.
 
 This design is the **opposite** of the one Hudu shipped, and the divergence should be recorded as a deliberate architectural decision rather than treated as an evolution of practice.
 
-| | Typed tools (Hudu) | Layered (proposed) |
-|---|---|---|
-| Validation | At tool-schema time; the client rejects bad calls before they run | At runtime, in our code |
-| Round-trips to first write | 1 | 2–3 |
-| Context cost | Linear in endpoints | Flat |
-| Drift risk | Hand-written schemas drift from the API | Generated from the instance; cannot drift |
-| Host UX | Per-tool names and hints | Five generic names |
+|                            | Typed tools (Hudu)                                                | Layered (proposed)                        |
+| -------------------------- | ----------------------------------------------------------------- | ----------------------------------------- |
+| Validation                 | At tool-schema time; the client rejects bad calls before they run | At runtime, in our code                   |
+| Round-trips to first write | 1                                                                 | 2–3                                       |
+| Context cost               | Linear in endpoints                                               | Flat                                      |
+| Drift risk                 | Hand-written schemas drift from the API                           | Generated from the instance; cannot drift |
+| Host UX                    | Per-tool names and hints                                          | Five generic names                        |
 
 The reason it is right here and was not right for Hudu is **A1 and the OpenAPI schema**. Hudu's 89 tools fit; NetBox's 446 do not. Hudu's spec was a wrong static document; NetBox's is served live by the instance. Both conditions have to hold for the layered pattern to beat typed tools, and both hold here.
 
@@ -273,9 +273,9 @@ The round-trip cost is real and should be measured, not assumed. The eval set in
 
 **Resolved by the Project Owner, 2026-08-05:**
 
-1. **Delete confirmation (D2)** — *Resolved: required.* `netbox_write` with `operation: "delete"` must receive `confirm` equal to the object's current `display` value.
-2. **Git history** — *Resolved: accepted as-is.* `c4a3944` stands as the origin point; traceability begins with the first governed PR.
-3. **`netbox-modeling` skill** — *Resolved: committed in this repository*, versioned with the tool contract, and used as the basis for the eval set.
+1. **Delete confirmation (D2)** — _Resolved: required._ `netbox_write` with `operation: "delete"` must receive `confirm` equal to the object's current `display` value.
+2. **Git history** — _Resolved: accepted as-is._ `c4a3944` stands as the origin point; traceability begins with the first governed PR.
+3. **`netbox-modeling` skill** — _Resolved: committed in this repository_, versioned with the tool contract, and used as the basis for the eval set.
 
 **Still open:**
 
@@ -290,9 +290,46 @@ Per Milestone 6, gaps this adoption exposed in the framework itself:
 
 1. **No standard governs tool-surface size or context budget.** A 446-tool server passes every current standard. `standards/ai-interface-standard.md` should set a measurable ceiling on `tools/list` cost and require it to be verified in CI.
 2. **No standard requires live contract testing.** It is the highest-value activity identified across two adoptions and appears nowhere in `standards/testing-standard.md`.
-3. **No standard covers evaluation of AI usability.** Both Hudu and this repository can prove tools *work* and neither can prove a model *chooses correctly*.
+3. **No standard covers evaluation of AI usability.** Both Hudu and this repository can prove tools _work_ and neither can prove a model _chooses correctly_.
 4. **`standards/repository-standard.md` lists artifacts without acceptance criteria** — "CI validation" is satisfied by a workflow that runs `true`.
 5. **Nothing defines how a repository records a divergence from a prior RFC.** This RFC diverges from RFC-001's tool-design approach; there is no prescribed mechanism for that other than prose.
+
+---
+
+## Recorded exception — independent review
+
+`CONSTITUTION.md` requires independent review, and
+`standards/repository-standard.md` requires review requirements on a governed
+repository. Neither was met for this change, and that is recorded here rather
+than papered over.
+
+The repository has exactly one person with write access. Every pull request in
+the `0.1.0` foundation was authored by Claude and approved by the Project
+Owner, who is also the only available reviewer. There is no second human
+reviewer, so "independent" in the constitutional sense was not achievable.
+
+What was done instead, and what it is worth:
+
+- **Adversarial agent review of `scripts/install.sh` and the documentation.**
+  Found two High-severity defects the author and `shellcheck` both missed — a
+  truthiness mismatch that reported `read-only` while registering 446 tools
+  including 89 cascading deletes, and a world-readable backup containing the
+  API token. This is the second project on which independent review found
+  every security defect and the author found none.
+- **Live contract testing against a real NetBox 4.6.0.** 433 checks. Found a
+  403-not-401 error mapping, a silent filter-drop that would have handed
+  models unfiltered collections, an unbounded HTML error body, and a
+  malformed object-type key.
+- **Mutation checks on the three load-bearing derivation rules.** Each was
+  confirmed to break tests when removed.
+
+None of that is a substitute for a second pair of human eyes on 34,000 lines.
+This exception should be closed, not normalised: revisit when a second
+reviewer with write access exists. The same condition is open on `hudu-mcp`
+for `enforce_admins`.
+
+Per `CONSTITUTION.md` Article I, silence is not approval — this exception is
+stated explicitly so that it was approved rather than assumed.
 
 ---
 
