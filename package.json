@@ -36,7 +36,7 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "build:skill": "node scripts/build-skill.mjs",
-    "clean": "rm -rf dist coverage",
+    "clean": "node -e \"for (const d of ['dist','coverage']) require('node:fs').rmSync(d, { recursive: true, force: true })\"",
     "typecheck": "tsc --noEmit -p tsconfig.test.json",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",

@@ -1,6 +1,6 @@
 # Eval set — can a model actually use this surface?
 
-`tests/` proves the five layered tools **behave correctly when called**. 245 tests,
+`tests/` proves the five layered tools **behave correctly when called**. 288 tests,
 and not one of them proves a model can **pick the right one**. That gap is the
 number-one open item on the sibling Hudu server, and it is sharper here: RFC-003
 replaced 446 typed tools with five layered ones, cutting `tools/list` from about
@@ -109,7 +109,9 @@ Entirely mechanical, no opinion involved:
   planning layer that under-describes fails rather than passing on the author's
   knowledge of NetBox.
 - **The round-trip count.** Recorded per task, against the budget, and broken out
-  as "calls before the first write" — the row RFC-003 puts at 2-3.
+  as "calls before the first write" — the row RFC-003's table put at 2-3. The
+  measurement corrected it: a realistic create costs 5 calls before the write and
+  6 in total, and RFC-003 carries an amendment saying so.
 
 ## What this cannot score
 
@@ -136,6 +138,14 @@ Tasks are tagged `mechanical`, `assisted` or `human` for exactly this reason, an
 the report prints an explicit "not settled by this run" section rather than
 letting a green run imply more than it earned. **Do not add a task whose success
 condition is a judgement and mark it `mechanical`.**
+
+That judgement has since been run by hand, against the published package with
+six blind models, and is recorded in
+[`docs/reference/eval-model-in-loop.md`](../docs/reference/eval-model-in-loop.md).
+It is not part of this suite and this suite cannot reproduce it. Two of its three
+probes went against the design — a name lookup cost 10 calls where the reference
+path is 2, a trivial count 4 where it is 1 — and the impossible-task probe
+passed. Read it before quoting a green run here.
 
 ## Scoring a model
 

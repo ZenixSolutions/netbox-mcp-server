@@ -28,21 +28,3 @@ export const ENV_NETBOX_TOKEN = "NETBOX_TOKEN";
  * certificates (common for on-prem NetBox). Defaults to verifying TLS.
  */
 export const ENV_NETBOX_INSECURE = "NETBOX_INSECURE";
-
-/**
- * Optional environment variable: "1" / "true" / "yes" to register only the
- * read-only tools (`netbox_list_*`, `netbox_get_*`, `netbox_global_search`).
- * All create/update/delete tools are omitted entirely, so the model cannot
- * call them. Defaults to off (full read/write surface).
- */
-export const ENV_NETBOX_READONLY = "NETBOX_READONLY";
-
-/**
- * Optional environment variable: comma-separated list of tool groups to
- * register, e.g. "dcim,ipam,search". Unset (the default) registers every
- * group. Use this to keep a client's tool count manageable.
- * Valid groups: search, dcim, dcim_org, dcim_components, ipam, ipam_org,
- * ipam_services, inventory, power, tenancy, virtualization, circuits,
- * deletes.
- */
-export const ENV_NETBOX_TOOL_GROUPS = "NETBOX_TOOL_GROUPS";

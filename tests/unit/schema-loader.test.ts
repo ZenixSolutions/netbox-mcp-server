@@ -256,8 +256,24 @@ describe("cache key", () => {
   });
 
   it("honours XDG_CACHE_HOME, then falls back to ~/.cache", () => {
-    expect(defaultCacheDir({ XDG_CACHE_HOME: "/tmp/xdg" })).toBe("/tmp/xdg/netbox-mcp");
-    expect(defaultCacheDir({})).toMatch(/\.cache\/netbox-mcp$/);
+    expect(defaultCacheDir({ XDG_CACHE_HOME: "/tmp/xdg" })).toContain("netbox-mcp");
+    expect(defaultCacheDir({}, "linux")).toMatch(/[\\/]\.cache[\\/]netbox-mcp$/);
+  });
+
+  it("uses each platform's own cache location", () => {
+    // A multi-megabyte schema document in ~/.cache on Windows or macOS works,
+    // and is somewhere neither platform ever looks — so it never gets cleaned
+    // up. XDG_CACHE_HOME still wins everywhere when explicitly set.
+    expect(
+      defaultCacheDir({ LOCALAPPDATA: "C:\\Users\\x\\AppData\\Local" }, "win32"),
+    ).toContain("netbox-mcp");
+    expect(defaultCacheDir({}, "darwin")).toMatch(/Library[\\/]Caches[\\/]netbox-mcp$/);
+    expect(defaultCacheDir({}, "linux")).toMatch(/\.cache[\\/]netbox-mcp$/);
+    expect(defaultCacheDir({ XDG_CACHE_HOME: "/explicit" }, "win32")).toMatch(
+      /explicit[\\/]netbox-mcp$/,
+    );
+    // Windows with no LOCALAPPDATA must still return something usable.
+    expect(defaultCacheDir({}, "win32")).toContain("netbox-mcp");
   });
 });
 

@@ -71,8 +71,9 @@ matches two objects, show both and ask which.
 **4. Describe before you write.** Call `netbox_describe` with the
 `object_type` and the operation you intend, once per type per task. It returns
 the required fields, the optional fields with their exact enum values, the
-read-only fields you must not send, and `depends on` — the object types that
-must exist first. Guessing field names instead does not save the round-trip:
+read-only fields you must not send, and a **"Must exist first"** section — the
+object types this one references. Guessing field names instead does not save the
+round-trip:
 `netbox_write` validates `data` against the same schema locally and hands you
 this description back on failure.
 
@@ -129,8 +130,9 @@ ids, so the user has a record and can spot anything wrong.
 
 ## Dependency order (build bottom-up)
 
-`netbox_describe` returns `depends on` mechanically for one type. This is the
-conventional order for a whole modelling task, which the schema cannot tell you:
+`netbox_describe` returns "Must exist first" mechanically for one type. This is
+the conventional order for a whole modelling task, which the schema cannot tell
+you:
 
 ```
 Region ─▶ Site ─▶ Location ─▶ Rack ─▶ Device ─▶ Interface ─▶ Cable
