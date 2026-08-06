@@ -57,3 +57,45 @@ describe.each(WORKFLOWS)("%s", (workflow) => {
     expect(build).toBeLessThan(smoke);
   });
 });
+
+/**
+ * The `.npmrc` `_authToken` line is load-bearing on ONE path and fatal on the
+ * other, which is why this is pinned rather than left to a comment.
+ *
+ * setup-node writes `//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}`.
+ * Under trusted publishing that variable is unset, so npm reads an empty
+ * credential, decides auth is configured, and never starts the OIDC exchange —
+ * the line has to go. Under a granular token that same line is the only thing
+ * telling npm to use NODE_AUTH_TOKEN — the line has to stay.
+ *
+ * Stripping it unconditionally passes every check including `npm publish
+ * --dry-run`, because a dry run never authenticates, and then fails ENEEDAUTH
+ * at the real publish. That is exactly what happened on the first v0.1.0
+ * release run.
+ */
+describe(".github/workflows/release.yml auth paths", () => {
+  const yaml = readFileSync(".github/workflows/release.yml", "utf8");
+
+  it("strips the _authToken line only when there is no NPM_TOKEN", () => {
+    const step = /- name: Strip the _authToken line[^\n]*\n([\s\S]*?)\n\s*- name:/.exec(
+      yaml,
+    );
+    expect(step, "the strip step is gone — was it renamed?").not.toBeNull();
+    expect(
+      step?.[1] ?? "",
+      "the strip step must be conditional. Unconditional, it deletes the line " +
+        "the granular-token path depends on, and the failure appears only at " +
+        "the real publish — after the dry run has passed.",
+    ).toMatch(/if:\s*env\.HAS_NPM_TOKEN\s*!=\s*'true'/);
+  });
+
+  it("never reads `secrets` in a step-level if", () => {
+    // A `secrets` reference in a step `if` does not fail the step — it fails
+    // the whole workflow file to parse, producing a run with no jobs, no logs
+    // and a message that points nowhere.
+    const stepIfs = yaml.split("\n").filter((l) => /^\s+if:/.test(l));
+    for (const line of stepIfs) {
+      expect(line, "use a job-level env, compared as a string").not.toContain("secrets.");
+    }
+  });
+});
