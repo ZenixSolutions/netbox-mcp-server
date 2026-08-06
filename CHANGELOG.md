@@ -12,6 +12,28 @@ surface may change in a minor release, with the change noted here.
 
 Nothing yet.
 
+## [0.1.3] - 2026-08-05
+
+### Changed
+
+- Tool descriptions no longer claim that discovery is mandatory. `netbox_discover`
+  opened with "START HERE" and "Do not guess one"; `netbox_read` said "Call this
+  AFTER netbox_discover". Neither was true — a wrong `object_type` is answered
+  with near-misses, so guessing a plausible key costs no more than looking it
+  up. `netbox_read` now says so and carries the naming convention, and
+  `netbox_global_search` leads with the condition that should trigger it.
+
+  **This did not reduce round-trips.** Re-running the same three probes with six
+  fresh blind models produced identical counts: 10 and 10 for a name lookup, 4
+  and 4 for a trivial count. One model did open with `netbox_global_search` for
+  the first time, found the complete answer in that one call — and then made
+  eight more, re-deriving through the layers to confirm what it already had.
+
+  The cost is defensive verification, not missing signposts, and wording will
+  not fix it. `docs/reference/eval-model-in-loop.md` records the negative result
+  and what would actually be needed. The change ships because the old text was
+  inaccurate, not because it worked.
+
 ## [0.1.2] - 2026-08-05
 
 ### Fixed
@@ -267,7 +289,8 @@ tool surface.
   registration lives in the `REGISTRARS` table in `src/server.ts`. The 15 tool
   counts were verified against the built binary and are correct as published.
 
-[Unreleased]: https://github.com/ZenixSolutions/netbox-mcp-server/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/ZenixSolutions/netbox-mcp-server/compare/v0.1.3...HEAD
+[0.1.3]: https://github.com/ZenixSolutions/netbox-mcp-server/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/ZenixSolutions/netbox-mcp-server/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/ZenixSolutions/netbox-mcp-server/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/ZenixSolutions/netbox-mcp-server/releases/tag/v0.1.0

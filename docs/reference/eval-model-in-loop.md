@@ -110,6 +110,63 @@ Two things follow, neither of them done:
    looking up an object by name, or the decision to keep it should be revisited
    on the evidence that it goes unused.
 
+## Round two — the fix did not work
+
+The two follow-ups above were implemented: `netbox_discover` lost its "START
+HERE" and its "Do not guess one"; `netbox_read` gained "**If you know the
+object_type, call this directly**" and the naming convention; and
+`netbox_global_search` was rewritten to lead with its trigger condition.
+
+Six fresh blind models, same three tasks, same rig.
+
+| Task              | Before |      After |
+| ----------------- | -----: | ---------: |
+| A — name lookup   | 10, 10 | **10, 10** |
+| B — trivial count |   4, 4 |   **4, 4** |
+| C — impossible    |   9, 7 |      8, 10 |
+
+**No change.** The one behavioural difference: one of the two models on task A
+opened with `netbox_global_search` — the first time any model has — and it
+worked. The answer was in that single response, both the device id and the IP
+with its "sw-core-01 management" description.
+
+It then made eight more calls.
+
+It did not trust the result. It tried `netbox_read` with the wrong argument
+shape, failed twice more guessing at `netbox_describe`, fell back to
+`netbox_discover`, and re-derived through the layers to confirm what it already
+had. The shortcut was found, used, and then verified into irrelevance.
+
+On task B, one model wrote its reasoning down: _"a plain list call with limit:1
+would have worked without describing first, but describing first is the safer
+default when the schema isn't already known."_ It had already guessed
+`dcim.device` correctly. The `netbox_describe` call was not needed to find the
+key; it was insurance.
+
+### What that means
+
+The round-trip cost is not a signposting problem, and description wording will
+not fix it. Models spend calls on **defensive verification** — confirming a
+schema they have correctly guessed, re-deriving an answer they already hold.
+Telling them a shortcut exists does not make them willing to stop at it.
+
+Two things follow, and both are real work rather than wording:
+
+1. **Make one call carry its own proof.** `netbox_global_search` returns ids
+   but not enough context for a model to feel finished. If a hit carried the
+   fields a follow-up `get` would return, the verification pass would have
+   nothing to add.
+2. **Make wrong arguments cheap.** Three of A's ten calls were argument-shape
+   errors — `{"resource":"devices","id":1}` against a tool that wants
+   `object_type` and `operation`. Each one currently costs a full round-trip.
+   An error that returned the correct shape _with a worked example_ would
+   collapse those three into one.
+
+The description change ships anyway: the old text asserted things that were
+not true — that discovery is mandatory, that a key must never be guessed — and
+accuracy is worth having whether or not it saves a call. But it is recorded
+here as **not having moved the number it was written to move**.
+
 ## Reproducing
 
 The rig is not committed: it depends on a mock and on spawning models, and a

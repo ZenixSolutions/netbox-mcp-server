@@ -119,19 +119,26 @@ const Input = {
 
 const DESCRIPTION = `Reads NetBox objects: one by id, or a filtered, paginated list. Never modifies anything.
 
-Call this AFTER netbox_discover (for the object_type) and, for anything but a trivial list, AFTER netbox_describe (for the filter names). Use netbox_write to change data. Use netbox_global_search when you do not yet know which object type a name belongs to.
+**If you know the object_type, call this directly.** Keys are \`<app>.<model>\`, singular — \`dcim.device\`, \`ipam.prefix\`, \`ipam.ipaddress\`, \`dcim.site\`. A wrong key is answered with near-misses, so guessing a plausible one costs no more than looking it up first. "How many devices are there?" is one call to this tool: list \`dcim.device\` and read the total.
+
+Reach for another tool when:
+  - the user named a THING rather than a type ("the switch sw-core-01") —
+    netbox_global_search finds it across types in one call;
+  - you need filter names you cannot guess, or are about to write —
+    netbox_describe;
+  - the type is a plugin model, which is not guessable — netbox_discover.
 
 Args:
-  - object_type (string, required)  key from netbox_discover, e.g. 'ipam.prefix'.
+  - object_type (string, required)  e.g. 'ipam.prefix'.
   - operation   (string, required)  'list' or 'get'.
   - id          (number)            required for 'get'.
   - filters     (object)            for 'list'; NetBox query-parameter names -> values.
   - limit / offset (number)         pagination for 'list'.
   - response_format ('markdown' | 'json')  use 'json' when chaining to another call.
 
-Returns Markdown by default, or JSON shaped { total, count, offset, limit, items, has_more, next_offset? }. Long responses are truncated and tell you the offset to resume from — paginate or filter rather than raising limit.
+Returns Markdown by default, or JSON shaped { total, count, offset, limit, items, has_more, next_offset? }. The total is reported whatever the limit, so limit=1 is enough to count. Long responses are truncated and tell you the offset to resume from — paginate or filter rather than raising limit.
 
-Note that a filter value is usually a slug or an id, not a display name: filter devices by site='dc1' (slug) or site_id=3, not site='DC 1'.`;
+A filter value is usually a slug or an id, not a display name: filter devices by site='dc1' (slug) or site_id=3, not site='DC 1'. An unknown filter name is rejected here with the valid ones listed, because NetBox itself would ignore it and return everything.`;
 
 export function registerRead(server: McpServer, schema: SchemaProvider): void {
   server.registerTool(
