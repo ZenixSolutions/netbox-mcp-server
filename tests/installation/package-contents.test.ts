@@ -34,11 +34,29 @@ function parsePackOutput(raw: string): PackResult {
   throw new Error(`Unrecognised npm pack --json shape: ${raw}`);
 }
 
+/**
+ * Invoking npm from Node is platform-specific, and gets it wrong twice.
+ *
+ * On Windows npm is `npm.cmd`. `execFileSync("npm", ...)` cannot find it —
+ * `.cmd` is not resolved without a shell — and fails ENOENT. Naming
+ * `npm.cmd` explicitly then fails EINVAL, because since the 2024
+ * command-injection hardening Node refuses to spawn a `.cmd` or `.bat` at
+ * all unless a shell is requested.
+ *
+ * So a shell is required on Windows. It is safe here for a specific reason
+ * worth stating: every argument below is a literal constant. Nothing from a
+ * test fixture, the environment or the filesystem reaches the command line,
+ * which is the condition that makes `shell: true` a quoting question rather
+ * than an injection one.
+ */
+const IS_WINDOWS = process.platform === "win32";
+
 describe("published package contents", () => {
   const result = parsePackOutput(
     execFileSync("npm", ["pack", "--dry-run", "--json"], {
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"],
+      shell: IS_WINDOWS,
     }),
   );
   const paths = (result.files ?? []).map((f) => f.path);
