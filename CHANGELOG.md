@@ -12,6 +12,33 @@ surface may change in a minor release, with the change noted here.
 
 Nothing yet.
 
+## [0.1.1] - 2026-08-05
+
+### Fixed
+
+- `docs/compatibility.md` stated the opposite of the truth in three places, and
+  a document whose only job is to be honest about limitations is worse than
+  useless when it is stale. It claimed the server had never been contract-tested
+  against a live instance, that plugin support was entirely unverified, and that
+  the tool surface was 446 tools costing ~180,000 tokens — all true when written
+  and all false by the time 0.1.0 shipped. It now records the 4.6.0 run (435
+  checks, 0 defects, `netbox_inventory` 2.6.0 verified), states plainly that one
+  instance is evidence rather than a range, and names the real trade the layered
+  design makes: a trivial read costs 1 call and a device with three
+  prerequisites costs 6.
+- The release workflow ran `Test` before `Build`, and stripped the `.npmrc`
+  `_authToken` line on both publish paths rather than only the
+  trusted-publishing one. The first cost a release run; the second failed
+  `ENEEDAUTH` after a green dry run, because a dry run never authenticates.
+  Both are now pinned by `tests/unit/workflow-step-order.test.ts`.
+
+### Changed
+
+- `actions/checkout` and `actions/setup-node` to v7. Held deliberately until
+  after a successful publish: `setup-node` is the action whose `.npmrc`
+  behaviour caused the failure above, and no CI job publishes, so CI cannot vet
+  it.
+
 ## [0.1.0] - 2026-08-05
 
 First release. The repository existed before this — 446 tools, no tests, no CI,
@@ -209,5 +236,6 @@ tool surface.
   registration lives in the `REGISTRARS` table in `src/server.ts`. The 15 tool
   counts were verified against the built binary and are correct as published.
 
-[Unreleased]: https://github.com/ZenixSolutions/netbox-mcp-server/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/ZenixSolutions/netbox-mcp-server/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/ZenixSolutions/netbox-mcp-server/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/ZenixSolutions/netbox-mcp-server/releases/tag/v0.1.0
