@@ -64,9 +64,11 @@ const Input = {
   response_format: ResponseFormatField,
 };
 
-const DESCRIPTION = `Fuzzy search across sites, racks, devices, interfaces, prefixes, IP addresses, VLANs and VRFs in one call.
+const DESCRIPTION = `**Finds a named thing when you do not know what type it is.** One call, across sites, racks, devices, interfaces, prefixes, IP addresses, VLANs and VRFs.
 
-Use this when the user names a *thing* — a hostname, a partial identifier, a VLAN name, an IP — and you do not know which object type it is. It is the shortcut past the layers: it returns ids you can hand straight to netbox_read (operation='get') or netbox_write.
+Use this the moment a request contains a specific identifier — a hostname, a partial name, an IP or prefix, a VLAN name, a serial. "What's the management IP for sw-core-01?", "where is rack R12?", "what is 10.0.4.7?" all start here. It returns each hit's numeric id, which you hand straight to netbox_read (operation='get') or netbox_write.
+
+It is the shortcut past the layers. Going netbox_discover -> netbox_describe -> netbox_read to look one named object up costs three calls and answers the same question this one does.
 
 Use netbox_discover instead when you need to know which object *types* exist, and netbox_read when you already know the type and want a filtered list.
 
@@ -76,7 +78,7 @@ Args:
   - resources (string[])             restrict to a subset of resource labels.
   - response_format ('markdown' | 'json')
 
-Returns hits grouped by resource with per-resource totals and each hit's numeric id.`;
+Returns hits grouped by resource with per-resource totals and each hit's numeric id. A resource with no matches is reported as empty, not as an error.`;
 
 interface SectionResult {
   label: string;

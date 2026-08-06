@@ -35,15 +35,20 @@ const Input = {
     ),
 };
 
-const DESCRIPTION = `START HERE. Lists the NetBox object types this instance actually supports — devices, racks, prefixes, VLANs, tenants, circuits, plugin models — with the operations each one allows.
+const DESCRIPTION = `Lists the NetBox object types this instance actually supports — devices, racks, prefixes, VLANs, tenants, circuits, plugin models — with the operations each one allows.
 
-NetBox is an infrastructure source of truth: it records sites, racks, hardware, interfaces, cabling, IP addresses and the relationships between them. Every other tool in this server is addressed by an \`object_type\` key (for example \`dcim.device\`, \`ipam.prefix\`), and this tool is where those keys come from. Do not guess one.
+NetBox is an infrastructure source of truth: it records sites, racks, hardware, interfaces, cabling, IP addresses and the relationships between them. Every other tool here is addressed by an \`object_type\` key.
 
-Layer order — follow it in this order:
-  1. netbox_discover  (this tool)  find the object_type you need.
-  2. netbox_describe               find the fields, filters and prerequisites for that type.
-  3. netbox_read / netbox_write    do the work.
-Use netbox_global_search instead when you already know the object type is irrelevant and you just want to find a named thing ("the switch called sw-core-01").
+Call this when you do not know the key. You often will not need it:
+
+  - The user named a specific THING — a hostname, an IP, a VLAN name?
+    Call netbox_global_search. It finds the object across types in one call.
+  - You already know the type, or can name it from the convention below?
+    Call netbox_read directly. A wrong key comes back with near-misses, which
+    costs the same as calling this tool and usually less.
+  - About to WRITE, or need filter or field names? netbox_describe next.
+
+Keys are \`<app>.<model>\`, singular: \`dcim.device\`, \`dcim.site\`, \`dcim.rack\`, \`dcim.interface\`, \`ipam.prefix\`, \`ipam.ipaddress\`, \`ipam.vlan\`, \`ipam.vrf\`, \`tenancy.tenant\`, \`virtualization.virtualmachine\`. Plugins use \`plugins.<plugin>.<model>\` and are NOT guessable — use this tool for those.
 
 Args:
   - query (string, optional)  free-text filter over key, label and summary.

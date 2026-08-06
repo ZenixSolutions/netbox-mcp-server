@@ -115,15 +115,51 @@ describe("layered tool surface", () => {
     expect(write?.idempotentHint).toBe(false);
   });
 
-  it("makes the layer ordering discoverable from the descriptions alone", async () => {
+  /**
+   * The previous version of this test asserted that netbox_discover's
+   * description says "START HERE". It did, and models obeyed it literally:
+   * running six of them against the published 0.1.1 package, a trivial count
+   * took four calls where one would do, and netbox_global_search — kept in the
+   * surface precisely so a name lookup costs one call — was used by NEITHER
+   * model on the task it exists for. See docs/reference/eval-model-in-loop.md.
+   *
+   * So the property worth pinning is not "the layer order is stated". It is
+   * "every description points at the CHEAPER route as well as the thorough
+   * one". A tool that only ever advertises the long way round gets taken the
+   * long way round.
+   */
+  it("points each tool at its cheaper alternative, not just at the next layer", async () => {
     const byName = new Map(
       (await listTools()).map((t) => [t.name, t.description ?? ""] as const),
     );
-    expect(byName.get("netbox_discover")).toContain("START HERE");
+
+    // Nothing may claim the start unconditionally. Case-SENSITIVE on purpose:
+    // the defect was a shouted directive at the top of a description, not the
+    // words themselves — "all start here" in ordinary prose is fine, and an
+    // earlier version of this assertion failed on exactly that.
+    for (const [name, description] of byName) {
+      expect(description, `${name} claims to be the mandatory entry point`).not.toContain(
+        "START HERE",
+      );
+    }
+
+    // The two tools a model reaches for first must both name the shortcut.
+    expect(byName.get("netbox_discover")).toContain("netbox_global_search");
+    expect(byName.get("netbox_read")).toContain("netbox_global_search");
+
+    // A model that already knows the type must be told it can go straight to
+    // the read — that is the four-calls-for-a-count case.
+    expect(byName.get("netbox_read")).toMatch(/call this directly/i);
+
+    // The shortcut has to say what triggers it, in the first line, or it loses
+    // the attention contest to whichever description is read first.
+    const search = byName.get("netbox_global_search") ?? "";
+    expect(search.split("\n")[0]).toMatch(/named thing|do not know what type/i);
+
+    // The layer order still has to be recoverable for the cases that need it.
     expect(byName.get("netbox_discover")).toContain("netbox_describe");
     expect(byName.get("netbox_describe")).toContain("netbox_discover");
     expect(byName.get("netbox_describe")).toContain("netbox_write");
-    expect(byName.get("netbox_read")).toContain("netbox_discover");
     expect(byName.get("netbox_write")).toContain("netbox_describe");
     expect(byName.get("netbox_global_search")).toContain("netbox_read");
   });
