@@ -12,6 +12,37 @@ surface may change in a minor release, with the change noted here.
 
 Nothing yet.
 
+## [0.1.2] - 2026-08-05
+
+### Fixed
+
+- **Array-valued filters were silently dropped, returning the complete
+  unfiltered collection.** Axios serialises an array as `name[]=value`;
+  NetBox's filters expect the key repeated, `name=a&name=b`, and NetBox
+  **ignores a parameter it does not recognise and answers 200 with
+  everything**. So the bracketed form did not error — it returned a plausible
+  wrong answer. Asking for the device named `sw-core-01` returned every device.
+
+  A comment in `src/client.ts` asserted the opposite and had done since before
+  the layered rewrite. The filter-name validation added in 0.1.0 cannot catch
+  this: the caller sends `name`, a legitimate parameter, and the corruption
+  happens afterwards during serialisation. A guard on the way in does not
+  protect against a bug on the way out.
+
+  Found by running the eval set against the published 0.1.1 package with two
+  independent models, both of which hit it and one of which wrote that it
+  "could easily lead someone to misjudge which device is a match."
+
+### Added
+
+- `docs/reference/eval-model-in-loop.md` — the model-in-the-loop judgement the
+  eval set flagged as needed and could not perform itself. Two of three probes
+  went against the design: a trivial read takes four calls where the reference
+  path is one, and `netbox_global_search` — kept in the surface specifically to
+  make name lookups cheap — was used by neither model on the task it exists for.
+  The impossible-task probe passed cleanly: neither model invented a tool, and
+  both refused to pass a `last_updated` timestamp off as an audit trail.
+
 ## [0.1.1] - 2026-08-05
 
 ### Fixed
@@ -236,6 +267,7 @@ tool surface.
   registration lives in the `REGISTRARS` table in `src/server.ts`. The 15 tool
   counts were verified against the built binary and are correct as published.
 
-[Unreleased]: https://github.com/ZenixSolutions/netbox-mcp-server/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/ZenixSolutions/netbox-mcp-server/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/ZenixSolutions/netbox-mcp-server/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/ZenixSolutions/netbox-mcp-server/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/ZenixSolutions/netbox-mcp-server/releases/tag/v0.1.0
