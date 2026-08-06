@@ -90,7 +90,21 @@ jobs:
       # npm fails earlier with ENEEDAUTH, still without attempting the
       # exchange. The registry entry must exist and the token line must not.
       # https://github.com/actions/setup-node/issues/1551
+      # ONLY on the trusted-publishing path.
+      #
+      # setup-node writes `//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}`
+      # into the .npmrc. With no NODE_AUTH_TOKEN set, npm reads an empty
+      # credential, concludes auth is already configured, never starts the OIDC
+      # exchange, and sends an unauthenticated PUT — a 404 indistinguishable
+      # from "package does not exist".
+      #
+      # On the TOKEN path that same line is what makes auth work: it is the
+      # only thing telling npm to use NODE_AUTH_TOKEN. Stripping it
+      # unconditionally — which this workflow did — leaves the token publish
+      # with no credential at all and fails ENEEDAUTH after a successful dry
+      # run, because a dry run never authenticates.
       - name: Strip the _authToken line setup-node writes
+        if: env.HAS_NPM_TOKEN != 'true'
         run: |
           npmrc="${NPM_CONFIG_USERCONFIG:-$HOME/.npmrc}"
           if [ -f "$npmrc" ]; then
