@@ -34,6 +34,17 @@ export class NetBoxClient {
         Accept: "application/json",
         "Content-Type": "application/json",
       },
+      // Axios serialises an array as `name[]=a&name[]=b`. NetBox's filters
+      // expect the parameter REPEATED — `name=a&name=b` — and, worse, NetBox
+      // silently ignores a parameter it does not recognise and returns the
+      // complete unfiltered collection. So `name[]=` did not error: it dropped
+      // the filter and answered with everything, which a caller cannot tell
+      // from a genuinely unfiltered match.
+      //
+      // The local filter-name validation does not catch this. The caller sends
+      // `name`, which is a real parameter, and the corruption happens after
+      // validation, during serialisation.
+      paramsSerializer: { serialize: repeatParams },
       httpsAgent: config.insecure
         ? new https.Agent({ rejectUnauthorized: false })
         : undefined,
@@ -111,10 +122,49 @@ export class NetBoxClient {
 }
 
 /**
- * Drop undefined / null / "" params. Array params with multiple values are
- * preserved so Axios repeats them (e.g. ?tag=foo&tag=bar) — NetBox expects
- * this for multi-value filters.
+ * Drop undefined / null / "" params. Arrays are preserved and serialised by
+ * `repeatParams` below.
  */
+/**
+ * Serialise params the way NetBox's filters expect: a repeated key per value,
+ * never an indexed or bracketed form.
+ */
+export function repeatParams(params: Record<string, unknown>): string {
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        const text = paramValue(item);
+        if (text !== undefined) search.append(key, text);
+      }
+    } else {
+      const text = paramValue(value);
+      if (text !== undefined) search.append(key, text);
+    }
+  }
+  return search.toString();
+}
+
+/**
+ * A query parameter is a scalar. Anything else — an object, a nested array, a
+ * symbol — has no meaningful query-string form, and `String()` would turn it
+ * into "[object Object]" and send that to NetBox as a filter value. Drop it
+ * instead of transmitting nonsense; the caller's filter names are already
+ * validated against the instance's own parameter list upstream of here.
+ */
+function paramValue(value: unknown): string | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value === "string") return value;
+  if (
+    typeof value === "number" ||
+    typeof value === "boolean" ||
+    typeof value === "bigint"
+  ) {
+    return String(value);
+  }
+  return undefined;
+}
+
 function cleanParams(params: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(params)) {
