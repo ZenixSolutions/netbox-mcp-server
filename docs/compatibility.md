@@ -35,9 +35,20 @@ support is a property of Node, not of this package. The matrix exists to prove
 that and to catch the things that _are_ platform-specific — path handling,
 shell assumptions, and where cache is written.
 
-**Windows ARM64 is untested.** GitHub does not offer a hosted runner for it. It
-is expected to work for the same reason the others do; expected is not tested,
-and that is the distinction this table exists to keep.
+**Two combinations are untested, and named rather than quietly implied:**
+
+- **Windows ARM64** — GitHub offers no hosted runner for it.
+- **macOS x86-64 (Intel)** — a `macos-13` job was added and removed. It sat
+  queued with zero steps while every other runner finished; GitHub is retiring
+  Intel macOS. A job that never gets scheduled blocks every pull request and
+  proves nothing.
+
+Both are expected to work for the same reason the tested rows do — the runtime
+dependencies are pure JavaScript, so the platform question is Node's, not this
+package's. Expected is not tested, and that is the distinction this table
+exists to keep. If you run either, the smoke test is
+`node scripts/smoke-cli.mjs` after a build, and a passing report on an untested
+row is worth an issue.
 
 ### Where the schema cache goes
 

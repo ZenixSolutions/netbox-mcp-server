@@ -33,7 +33,11 @@ jobs:
           - { os: ubuntu-24.04-arm, node: "22", label: "linux arm64 · node 22" }
           - { os: windows-latest, node: "22", label: "windows x64 · node 22" }
           - { os: macos-14, node: "22", label: "macos arm64 · node 22" }
-          - { os: macos-13, node: "22", label: "macos x64 · node 22" }
+          # macos-13 (Intel) is deliberately absent. It was tried: the job sat
+          # queued with zero steps while every other runner finished, and
+          # GitHub is retiring Intel macOS. A job that never gets scheduled
+          # blocks every pull request and proves nothing, so macOS x86-64 is
+          # documented as untested instead — see docs/compatibility.md.
     steps:
       - uses: actions/checkout@v7
 
