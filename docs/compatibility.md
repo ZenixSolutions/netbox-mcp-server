@@ -8,8 +8,52 @@ please open an issue.
 |           | Supported                                                         |
 | --------- | ----------------------------------------------------------------- |
 | Node.js   | 20.11 LTS and newer. Node 18 is end-of-life and is not supported. |
-| Platforms | macOS, Linux, Windows. CI runs Linux only.                        |
 | Transport | **stdio only.**                                                   |
+
+### Platforms and architectures
+
+Every row below is exercised on every push. A platform this project has not
+run on is not a platform it supports, and the previous version of this table
+claimed macOS and Windows while CI ran Linux only.
+
+| OS      | Architecture          | Runner             | Node      |
+| ------- | --------------------- | ------------------ | --------- |
+| Linux   | x86-64                | `ubuntu-latest`    | 20 and 22 |
+| Linux   | ARM64                 | `ubuntu-24.04-arm` | 22        |
+| Windows | x86-64                | `windows-latest`   | 22        |
+| macOS   | ARM64 (Apple silicon) | `macos-14`         | 22        |
+| macOS   | x86-64 (Intel)        | `macos-13`         | 22        |
+
+Each runs typecheck, lint, format, build, the full test suite, and a smoke test
+of the built binary's CLI contract — `--version`, `--help`, `--list-tools`
+without credentials, and `--check` returning 0 configured and 78 not.
+
+Nothing here is architecture-sensitive by design: the three runtime
+dependencies (`@modelcontextprotocol/sdk`, `axios`, `zod`) are pure JavaScript,
+so there is no native module to compile and no prebuilt binary to match. ARM
+support is a property of Node, not of this package. The matrix exists to prove
+that and to catch the things that _are_ platform-specific — path handling,
+shell assumptions, and where cache is written.
+
+**Windows ARM64 is untested.** GitHub does not offer a hosted runner for it. It
+is expected to work for the same reason the others do; expected is not tested,
+and that is the distinction this table exists to keep.
+
+### Where the schema cache goes
+
+The server caches the instance's OpenAPI document — several megabytes — keyed
+by NetBox version. It is written to the platform's own convention rather than
+to `~/.cache` everywhere, because a large file somewhere the OS never looks at
+is a file nobody ever cleans up:
+
+|                      | Location                                              |
+| -------------------- | ----------------------------------------------------- |
+| `XDG_CACHE_HOME` set | `$XDG_CACHE_HOME/netbox-mcp` — wins on every platform |
+| Linux                | `~/.cache/netbox-mcp`                                 |
+| macOS                | `~/Library/Caches/netbox-mcp`                         |
+| Windows              | `%LOCALAPPDATA%\netbox-mcp\Cache`                     |
+
+Deleting the cache directory is safe: the next call re-fetches.
 
 ## MCP clients
 
@@ -96,7 +140,8 @@ schema document NetBox generates has no plugins installed, so `/api/plugins/**`
 appears nowhere in it and none of the derivation was exercised against a plugin
 serializer until a live run. Against 4.6.0 with `netbox_inventory` 2.6.0, all 31
 plugin paths classified correctly and all 12 plugin object types resolved their
-write schemas — including the four that need the `Writable<Model>Request` form.
+write schemas — including the two that need the `Writable<Model>Request` form
+(`plugins.inventory.assetrole` and `plugins.inventory.inventoryitemgroup`).
 
 That is one plugin. A plugin that names its endpoints differently, or nests them
 more deeply, has never been tried. `netbox_global_search` also still names
@@ -112,15 +157,15 @@ search will attempt that endpoint on an instance without the plugin.
   write. See [`docs/reference/eval-results.md`](./reference/eval-results.md).
   In exchange, `tools/list` is ~3,000 tokens rather than the ~180,000 the
   previous one-tool-per-operation surface cost.
-- **Whether a model picks the right path is unmeasured.** The eval set measures
-  the reference path; three of its ten tasks need a human or an LLM judge to
-  decide whether a model behaved correctly, and that has not been done.
-- **`device_id` versus `device`.** Tools that attach an object to a device
-  expose the argument as `device_id`, not `device`, and rename it before the
-  request. Anthropic's remote-devices bridge reserves the top-level argument
-  name `device` for its own routing and strips it before the call reaches this
-  server. If you are not going through that bridge, the rename is invisible —
-  but the argument name in the schema is still `device_id`.
+- **Models spend more round-trips than the reference path needs.** The eval set
+  measures the reference path; three of its ten tasks need a human or an LLM
+  judge, and that judgement has since been run and is recorded in
+  [`docs/reference/eval-model-in-loop.md`](./reference/eval-model-in-loop.md).
+  Two of its three probes went against the design: a name lookup took 10 calls
+  against a reference path of 2, and a trivial count took 4 against 1. The cost
+  is defensive re-verification through the layers, not missing signposts —
+  rewording the tool descriptions in 0.1.3 did not change the counts. The
+  impossible-task probe passed: neither model invented a tool.
 - **`NETBOX_INSECURE=1` disables TLS verification entirely**, which exposes the
   token to anyone able to intercept the connection. Prefer installing your
   internal root CA into the system trust store.

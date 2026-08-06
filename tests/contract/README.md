@@ -96,8 +96,8 @@ Do not change either probe to send a well-formed body or a real id.
 
 ## Extending it
 
-Add a file, wrap the block in `describeContract(...)` from `harness.ts`, and use
-`check()` (record + assert) or `record()` (record only) so the observation
-reaches the report. `checkAll()` records a batch and then fails once listing
-every mismatch — use it whenever "report every one, do not stop at the first"
-applies.
+Add a file, wrap the block in `describeContract(...)` from `expectations.ts`, and
+use `check()` (record + assert, also from `expectations.ts`) or `record()`
+(record only, from `harness.ts`) so the observation reaches the report.
+`checkAll()` records a batch and then fails once listing every mismatch — use it
+whenever "report every one, do not stop at the first" applies.

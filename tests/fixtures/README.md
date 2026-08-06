@@ -14,7 +14,7 @@ hand-written: every path item and component schema is copied verbatim from upstr
 | OpenAPI version     | 3.0.3                                                                                                                                                           |
 | Generator           | drf-spectacular 0.30.0 (see upstream `requirements.txt`)                                                                                                        |
 | Full document stats | 308 paths, 1043 component schemas                                                                                                                               |
-| This subset         | 18 paths, 91 component schemas, ~256 KB                                                                                                                         |
+| This subset         | 18 paths, 91 component schemas, ~445 KB                                                                                                                         |
 
 Upstream regenerates and commits this document itself; `scripts/verify-openapi.sh` in the
 NetBox repo diffs `python netbox/manage.py spectacular --format openapi-json` against

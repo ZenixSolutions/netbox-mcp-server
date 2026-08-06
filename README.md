@@ -1,42 +1,46 @@
 # netbox-mcp-server
 
-A [Model Context Protocol](https://modelcontextprotocol.io/) server that gives an AI
-assistant read (and optionally write) access to your [NetBox](https://netbox.dev/)
-instance — DCIM, IPAM, circuits, virtualization, tenancy, power, and the
-`netbox-inventory` plugin.
+A [Model Context Protocol](https://modelcontextprotocol.io/) server that lets an AI
+assistant read — and, if its token allows, write — your [NetBox](https://netbox.dev/)
+instance: DCIM, IPAM, circuits, virtualization, tenancy, power, and whatever plugins that
+instance has installed.
 
 Written in TypeScript on the official `@modelcontextprotocol/sdk`. Runs locally over
-stdio as a subprocess of any MCP-aware client: Claude Desktop, Claude Code, Codex CLI,
-Cursor, Continue.
+stdio as a subprocess of an MCP-aware client (Claude Desktop, Claude Code, Cursor,
+Codex).
 
-> **Installing this?** Paste this into ChatGPT, Claude, or any assistant that can browse
+**Five tools, not several hundred.** The object types, fields, filters and enum values
+are not hard-coded — they are derived at runtime from the connected instance's own
+`/api/schema/` document, so the surface describes _your_ NetBox, including its plugins
+and custom fields. A `tools/list` response is about 12,000 characters of descriptions and
+schemas, roughly 3,000 tokens.
+
+> **Installing this?** Paste this into Claude, ChatGPT, or any assistant that can browse
 > and run commands:
 >
 > > Read https://raw.githubusercontent.com/zenixsolutions/netbox-mcp-server/main/AGENTS.md
 > > and follow it to install the NetBox MCP server on my Mac.
 >
 > [`AGENTS.md`](AGENTS.md) is a step-by-step runbook written for an AI assistant to
-> execute without guessing — dependency checks, client config, verification, and
-> troubleshooting. Humans can use the Quick start below instead.
+> execute without guessing. Humans can use the Quick start below instead.
 
 ---
 
 ## Quick start
 
-There is nothing to clone, build, or install. Your MCP client launches the server with
-`npx`, which fetches the published package on first use.
+There is nothing to clone or build. Your MCP client launches the server with `npx`, which
+fetches the published package on first use.
 
-You need Node.js **>= 20.11** (`node --version`) and a NetBox API token: **NetBox → your
-user menu → API Tokens → Add a token**. Tick **Read-only** on the token unless you are
-supposed to change infrastructure records, and set an expiry date.
+You need:
 
-> The package is not on the npm registry yet — `npx @zenixsolutions/netbox-mcp` returns
-> `404` until the first release is published. Until then, use
-> [Building from a clone](#building-from-a-clone) below.
+- **Node.js >= 20.11** (`node --version`). Node 18 is end-of-life and unsupported.
+- **A NetBox API token** — see [Creating the token](#creating-the-token) below.
 
-**Claude Desktop** — `~/Library/Application Support/Claude/claude_desktop_config.json`
-(macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows). Add the `netbox`
-entry to the `mcpServers` object you already have; do not replace the file:
+### Claude Desktop
+
+Edit `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or
+`%APPDATA%\Claude\claude_desktop_config.json` (Windows). Add the `netbox` entry to the
+`mcpServers` object you already have; do not replace the file.
 
 ```json
 {
@@ -46,8 +50,7 @@ entry to the `mcpServers` object you already have; do not replace the file:
       "args": ["-y", "@zenixsolutions/netbox-mcp"],
       "env": {
         "NETBOX_URL": "https://netbox.yourcompany.com",
-        "NETBOX_TOKEN": "your-api-token",
-        "NETBOX_READONLY": "1"
+        "NETBOX_TOKEN": "your-api-token"
       }
     }
   }
@@ -59,14 +62,13 @@ from Finder and never sources your shell profile, so a bare `"npx"` — like a b
 `"node"` — often fails with `spawn npx ENOENT`. Fully quit Claude Desktop (Cmd-Q) and
 reopen it after editing the config.
 
-**Claude Code**:
+### Claude Code
 
 ```bash
 read -rs NETBOX_TOKEN                       # paste the token; nothing is echoed
 claude mcp add netbox \
   --env NETBOX_URL="https://netbox.yourcompany.com" \
   --env NETBOX_TOKEN="$NETBOX_TOKEN" \
-  --env NETBOX_READONLY=1 \
   -- "$(command -v npx)" -y @zenixsolutions/netbox-mcp
 unset NETBOX_TOKEN
 ```
@@ -74,11 +76,157 @@ unset NETBOX_TOKEN
 Do not put the token in `~/.zshrc` or any other shell profile. It belongs in the client
 config and nowhere else.
 
-Pin the version — `"@zenixsolutions/netbox-mcp@0.1.0"` — if you do not want the tool
-surface to change between restarts; unpinned, `npx` resolves the latest release each time
-its cache misses. Other clients: [`AGENTS.md` § 6](AGENTS.md#6-configure-the-ai-client).
+Pin the version — `"@zenixsolutions/netbox-mcp@0.1.3"` — if you do not want the tool
+surface to change between restarts. This project is below `1.0.0`, and the
+[CHANGELOG](CHANGELOG.md) is where surface changes are recorded. Other clients:
+[`AGENTS.md`](AGENTS.md).
 
-### Building from a clone
+Then ask your assistant: _"Using the netbox tools, list the first 5 sites."_
+
+### Creating the token
+
+**NetBox → your user menu → API Tokens → Add a token.**
+
+- Leave **Write enabled** unchecked unless the assistant is meant to change
+  infrastructure records. This is the only write control there is (see
+  [Write access](#write-access)).
+- Set an expiry date.
+- Constrain the token's object permissions to what the assistant actually needs.
+
+---
+
+## The five tools
+
+| Tool                   | What it does                                                                                                                                  |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `netbox_global_search` | Finds a named thing when you do not know its type — a hostname, an IP, a VLAN name, a serial.                                                 |
+| `netbox_discover`      | Lists the object types this instance supports, and the operations each one allows.                                                            |
+| `netbox_describe`      | Explains one object type: required fields, optional fields with enum values, read-only fields, prerequisites, and the filters `list` accepts. |
+| `netbox_read`          | Reads objects — one by id, or a filtered, paginated list. Never modifies anything.                                                            |
+| `netbox_write`         | Creates, updates or deletes one object.                                                                                                       |
+
+The intended path for a change is `netbox_discover` → `netbox_describe` → `netbox_write`.
+`netbox_global_search` is the shortcut past that: looking one named object up costs a
+single call rather than three. A read where you already know the type — `dcim.device`,
+`ipam.prefix` — is one call to `netbox_read`.
+
+Object type keys are `<app>.<model>`, singular. Plugin models are
+`plugins.<plugin>.<model>` and are not guessable, which is what `netbox_discover` is for.
+
+A few behaviours worth knowing:
+
+- **A wrong object type or filter name is refused locally**, with near-misses or the
+  valid filter names listed. NetBox itself answers `200` and the entire unfiltered
+  collection for a query parameter it does not recognise, so the server rejects unknown
+  filters rather than passing them through.
+- **`netbox_write` validates `data` against the instance's schema before sending
+  anything.** A rejection returns the same description `netbox_describe` would have.
+- **`update` is a partial write.** Only the fields present in `data` change.
+- **`delete` requires `confirm` to equal the object's current `display` value.** Read the
+  object first, copy `display`, pass it back. NetBox cascades deletes — removing a site
+  can remove its racks, devices and prefixes — and it cannot be undone.
+- `netbox_read` and `netbox_global_search` return Markdown by default or JSON on request.
+  Lists page at 50 by default (max 1000) and report `total`, `has_more` and
+  `next_offset`; any response over 25,000 characters is truncated with the offset to
+  resume from.
+
+**Layering costs round-trips.** A trivial read that one `netbox_read` call answers has
+been observed taking four calls, and a name lookup ten. That is measured, not estimated,
+and rewording the tool descriptions did not fix it — see
+[`docs/reference/eval-model-in-loop.md`](docs/reference/eval-model-in-loop.md) and
+[`docs/reference/eval-results.md`](docs/reference/eval-results.md). What it buys is a
+`tools/list` that fits in a context window.
+
+The design rationale is
+[RFC-003](docs/rfc/RFC-003-netbox-mcp-layered-tool-surface.md).
+
+---
+
+## Configuration
+
+Three environment variables. There are no others.
+
+| Variable          | Required | Default | Meaning                                                                                                                                         |
+| ----------------- | -------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `NETBOX_URL`      | **yes**  | —       | Base URL of your NetBox, e.g. `https://netbox.corp.com`. **Omit `/api`** — the server appends it. A trailing `/` or `/api` is stripped for you. |
+| `NETBOX_TOKEN`    | **yes**  | —       | NetBox API token.                                                                                                                               |
+| `NETBOX_INSECURE` | no       | off     | `1`/`true`/`yes`/`y`/`on` skips TLS certificate verification. Prefer installing your internal root CA.                                          |
+
+The instance's OpenAPI document is fetched once and cached on disk under
+`$XDG_CACHE_HOME/netbox-mcp` (or `~/.cache/netbox-mcp`), keyed by the NetBox version and
+installed plugin set from `/api/status/`. Upgrading NetBox or adding a plugin invalidates
+it; a cache that cannot be read or written is never fatal.
+
+### Write access
+
+**Write access is controlled by the NetBox token, not by this server.** There is no
+server-side read-only switch, and that is deliberate: an environment variable that hides
+the write tool is a suggestion, whereas a token with `write_enabled` unchecked and scoped
+object permissions is enforced by NetBox, where no tool argument can reach it.
+
+Issue a read-only token for anyone who does not need to change records. If a write is
+refused, NetBox answers `403` and the server's error text names the likely cause —
+including the token's `write_enabled` flag.
+
+More on operating this safely, including prompt-injection risk with a write-enabled
+token: [SECURITY.md](SECURITY.md).
+
+---
+
+## Command-line surface
+
+The binary is normally launched by a client, but it has four verbs for verifying an
+install. Substitute `node dist/index.js` for `netbox-mcp` if you built from a clone.
+
+| Command                   | Does                                                                                         | Exit code                       |
+| ------------------------- | -------------------------------------------------------------------------------------------- | ------------------------------- |
+| `netbox-mcp --help`       | Prints usage and every environment variable. Reads no configuration.                         | 0                               |
+| `netbox-mcp --version`    | Prints the version, e.g. `0.1.3`.                                                            | 0                               |
+| `netbox-mcp --check`      | Validates configuration and names the first missing or invalid variable.                     | **0** usable, **78** not usable |
+| `netbox-mcp --list-tools` | Prints each tool name to stdout and `N tools registered.` to stderr. Needs no NetBox at all. | 0                               |
+
+`--check` is the verb for diagnosing a configuration problem. `--help` returns before any
+configuration is read, so it prints the same output whether your credentials are correct,
+wrong, or absent — it can never surface a config error.
+
+```bash
+# Is the configuration usable? Names the offending variable and exits 78 if not.
+NETBOX_URL=https://netbox.corp.com NETBOX_TOKEN="$NETBOX_TOKEN" netbox-mcp --check
+# -> ok: netbox-mcp-server v0.1.3 configured for https://netbox.corp.com
+
+# Does the binary work at all? Needs no credentials and makes no network calls.
+netbox-mcp --list-tools
+# -> netbox_global_search / netbox_discover / netbox_describe / netbox_read / netbox_write
+#    5 tools registered.        (on stderr)
+
+# Do the credentials work against NetBox itself?
+curl -sS -H "Authorization: Token $NETBOX_TOKEN" \
+  "$NETBOX_URL/api/dcim/sites/?limit=1" | head -c 200
+```
+
+Keep the token in a shell variable rather than typing it into a command: command lines
+land in shell history and are visible in `ps` to every process on the machine.
+
+---
+
+## Compatibility and limitations
+
+The honest source is [`docs/compatibility.md`](docs/compatibility.md). In short:
+
+- Contract-tested against **NetBox 4.6.0 with `netbox_inventory` 2.6.0 — 435 checks, 0
+  defects.** That is one instance, which is evidence, not a supported range. Response
+  shapes differ across NetBox versions; please include yours in any bug report. The
+  compatibility doc explains how to run the suite against your own instance with a
+  read-only token, and what to send back.
+- **stdio only.** There is no remote HTTP transport, so clients that only speak HTTP
+  (ChatGPT connectors, Grok connectors) cannot use this.
+- One plugin has been verified. Others have never been tried.
+- Known limitations — round-trip cost, the `device_id` argument name, no file uploads, no
+  GraphQL — are listed there rather than duplicated here.
+
+---
+
+## Building from a clone
 
 For contributors, and for machines that cannot reach the npm registry:
 
@@ -100,7 +248,7 @@ Then use the same client config as above, with `command` set to the absolute pat
 "netbox": {
   "command": "/opt/homebrew/bin/node",
   "args": ["/Users/YOU/netbox-mcp-server/dist/index.js"],
-  "env": { "NETBOX_URL": "...", "NETBOX_TOKEN": "...", "NETBOX_READONLY": "1" }
+  "env": { "NETBOX_URL": "...", "NETBOX_TOKEN": "..." }
 }
 ```
 
@@ -108,122 +256,13 @@ Tildes (`~`) are not expanded by MCP clients — both paths must be absolute.
 
 ---
 
-## What it exposes
-
-**446 tools across 89 NetBox resources.** Every resource gets `netbox_list_<plural>`,
-`netbox_get_<singular>`, `netbox_create_<singular>`, `netbox_update_<singular>` (PATCH
-semantics), and `netbox_delete_<singular>` — plus `netbox_global_search`, which fans a
-fuzzy query out across resources in parallel.
-
-| Group             | Tools | Covers                                                                                                         |
-| ----------------- | ----: | -------------------------------------------------------------------------------------------------------------- |
-| `search`          |     1 | cross-resource fuzzy lookup                                                                                    |
-| `dcim`            |    40 | sites, locations, racks, manufacturers, device types, device roles, platforms, devices, interfaces, cables     |
-| `dcim_org`        |    20 | regions, site groups, rack roles, rack types, rack reservations                                                |
-| `dcim_components` |    76 | modules, module/device bays, console + front + rear ports, MAC addresses, inventory items, and their templates |
-| `ipam`            |    32 | prefixes, IP addresses, VLANs, VLAN groups, VRFs, aggregates, IP ranges, roles                                 |
-| `ipam_org`        |    16 | RIRs, ASNs, ASN ranges, route targets                                                                          |
-| `ipam_services`   |    24 | services, service templates, FHRP groups, VLAN translation policies + rules                                    |
-| `inventory`       |    28 | `netbox-inventory` plugin: assets, suppliers, purchases, deliveries                                            |
-| `power`           |    24 | power panels, feeds, ports, outlets, and templates                                                             |
-| `tenancy`         |    24 | tenants, tenant groups, contacts, contact roles/groups/assignments                                             |
-| `virtualization`  |    28 | clusters, cluster types/groups, VMs, VM interfaces, virtual disks                                              |
-| `circuits`        |    44 | providers, provider accounts/networks, circuits, terminations, circuit groups, virtual circuits                |
-| `deletes`         |    89 | `netbox_delete_*` for every resource                                                                           |
-
-All list tools support:
-
-- rich per-resource filters (site, status, role, tenant, VRF, …)
-- universal filters — `q` (fuzzy text), `tag[]`, `created_after`, `created_before`
-- pagination via `limit` / `offset`, with `has_more` and `next_offset` in the response
-- `response_format` — `markdown` (default) or `json`
-- automatic truncation at 25,000 characters, with guidance to paginate
-
----
-
-## Configuration
-
-| Variable             | Required | Default | Meaning                                                                                                                                         |
-| -------------------- | -------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `NETBOX_URL`         | **yes**  | —       | Base URL of your NetBox, e.g. `https://netbox.corp.com`. **Omit `/api`** — the server appends it. A trailing `/` or `/api` is stripped for you. |
-| `NETBOX_TOKEN`       | **yes**  | —       | NetBox API token.                                                                                                                               |
-| `NETBOX_INSECURE`    | no       | off     | `1`/`true`/`yes` skips TLS certificate verification. For on-prem NetBox behind an internal CA.                                                  |
-| `NETBOX_READONLY`    | no       | off     | `1`/`true`/`yes` registers only `list`, `get`, and `search` tools (179 total). Create, update, and delete tools are **not registered at all**.  |
-| `NETBOX_TOOL_GROUPS` | no       | all     | Comma-separated allowlist of groups from the table above, e.g. `search,dcim,ipam`. Unknown names are ignored with a warning on stderr.          |
-
-Both `NETBOX_READONLY` and `NETBOX_TOOL_GROUPS` default to off — with neither set, the
-full 446-tool surface is registered, exactly as before these options existed.
-
-### Suggested rollout profiles
-
-```bash
-# Most people: read-only, full visibility          -> 179 tools
-NETBOX_READONLY=1
-
-# Read-only, trimmed for clients that struggle
-# with large tool counts                            ->  49 tools
-NETBOX_READONLY=1
-NETBOX_TOOL_GROUPS=search,dcim,ipam,tenancy
-
-# Engineers who document as they work: write,
-# but no delete tools exist at all                  -> 233 tools
-NETBOX_TOOL_GROUPS=search,dcim,dcim_org,dcim_components,ipam,ipam_org,power,tenancy
-
-# Administrators: everything, deletes included      -> 446 tools
-# (set nothing)
-```
-
-`NETBOX_TOOL_GROUPS` is an explicit allowlist — anything you do not name is omitted,
-**including `deletes`**. Name `deletes` deliberately if you want it.
-
----
-
-## Command-line surface
-
-The binary is normally launched by a client, but it has four verbs for verifying an
-install. Substitute `node dist/index.js` for `netbox-mcp` if you built from a clone.
-
-| Command                   | Does                                                                                                | Exit code                       |
-| ------------------------- | --------------------------------------------------------------------------------------------------- | ------------------------------- |
-| `netbox-mcp --help`       | Prints usage and every environment variable. Reads no configuration.                                | 0                               |
-| `netbox-mcp --version`    | Prints the version, e.g. `0.1.0`.                                                                   | 0                               |
-| `netbox-mcp --check`      | Validates configuration and names the first missing/invalid variable.                               | **0** usable, **78** not usable |
-| `netbox-mcp --list-tools` | Prints every registered tool name to stdout, `N tools registered.` to stderr. Needs no credentials. | 0                               |
-
-`--check` is the verb for diagnosing a configuration problem. `--help` returns before any
-configuration is read, so it prints the same output whether your credentials are correct,
-wrong, or absent — it can never surface a config error.
-
-## Verifying an install
-
-```bash
-# Is the configuration usable? Prints the offending variable and exits 78 if not.
-NETBOX_URL=https://netbox.corp.com NETBOX_TOKEN="$NETBOX_TOKEN" netbox-mcp --check
-# -> ok: netbox-mcp-server v0.1.0 configured for https://netbox.corp.com
-
-# Does the server register the tools you expect? Needs no credentials.
-netbox-mcp --list-tools | wc -l                      # -> 446
-NETBOX_READONLY=1 netbox-mcp --list-tools | wc -l     # -> 179
-
-# Do the credentials work against NetBox itself?
-curl -sS -H "Authorization: Token $NETBOX_TOKEN" \
-  "$NETBOX_URL/api/dcim/sites/?limit=1" | head -c 200
-```
-
-Keep the token in a shell variable rather than typing it into a command: command lines
-land in shell history and are visible in `ps` to every process on the machine.
-
-Then ask your assistant: _"Using the netbox tools, list the first 5 sites."_
-
----
-
 ## Troubleshooting
 
 The most common failure by far: **`spawn npx ENOENT` / `spawn node ENOENT` in a GUI
-client**. Claude Desktop and ChatGPT are launched from Finder and never source your
-`~/.zshrc`, so an `npx` or `node` installed by nvm/fnm/asdf/Volta/Homebrew is invisible
-to them. Put the absolute path from `command -v npx` (or `command -v node`) in the
-config, not the bare string `"npx"`.
+client.** Claude Desktop is launched from Finder and never sources your `~/.zshrc`, so an
+`npx` or `node` installed by nvm/fnm/asdf/Volta/Homebrew is invisible to it. Put the
+absolute path from `command -v npx` (or `command -v node`) in the config, not the bare
+string `"npx"`.
 
 Second most common: **`Missing required environment variable ...`**. Run `--check` with
 the same variables the config sets — it names the variable and exits 78.
@@ -234,60 +273,44 @@ Claude Desktop logs each server separately:
 tail -f ~/Library/Logs/Claude/mcp-server-netbox.log
 ```
 
-Full table of symptoms and fixes: [`AGENTS.md` § 8](AGENTS.md#8-troubleshooting).
+Full table of symptoms and fixes: [`AGENTS.md`](AGENTS.md).
 
 ---
 
 ## Development
 
 ```bash
-npm run dev          # tsx watch src/index.ts
-npm run build        # tsc -> dist/
-npm run typecheck    # tsc --noEmit, sources + tests
-npm run lint         # eslint
-npm run format:check # prettier --check
-npm test             # vitest run
-npm run clean
+npm run dev           # tsx watch src/index.ts
+npm run build         # tsc -> dist/
+npm run typecheck     # tsc --noEmit, sources + tests
+npm run lint          # eslint
+npm run format:check  # prettier --check
+npm test              # vitest run
+npm run test:contract # opt-in, against a live instance with a read-only token
+npm run eval          # opt-in, evals/
 ```
 
 ```
 src/
   index.ts            entry point; argv parsing (--help/--version/--check/--list-tools)
-  server.ts           server construction, tool-group registrars, introspection
-  constants.ts        character limits, env var names
+  server.ts           server construction and introspection
   config.ts           env parsing / validation
-  gating.ts           NETBOX_READONLY + NETBOX_TOOL_GROUPS
+  constants.ts        character limits, page sizes, env var names
   client.ts           axios-based NetBox client
-  errors.ts           friendly API error formatting
+  errors.ts           NetBox API error formatting
   formatting.ts       markdown rendering + pagination payload
-  registrars.ts       list/get/create/update/delete tool factories
+  schema/             fetch, cache and interpret the instance's /api/schema/
   schemas/common.ts   shared Zod schemas
-  tools/              per-domain resource registrations
+  tools/layered/      the five tools: search, discover, describe, read, write
+skills/
+  netbox-modeling/    agent skill, versioned with the tool contract it names
 scripts/
   check-changelog.mjs release guard: CHANGELOG has a section for the current version
 ```
 
-Adding a resource means adding a descriptor + schemas in the relevant `tools/*.ts` file;
-the registrars generate the five tools. New groups must also be added to
-`ALL_TOOL_GROUPS` in `src/gating.ts` and to the `REGISTRARS` table in `src/server.ts`.
-
----
-
-## Security notes
-
-- The token is read only from `NETBOX_TOKEN`. It is never logged or echoed in a tool
-  response.
-- **The NetBox token is the real permission boundary.** Issue read-only tokens in NetBox
-  itself for anyone who does not need write access; `NETBOX_READONLY` is a convenience
-  layer that keeps the tools out of the model's context, not an enforcement mechanism.
-- **Deletes cascade and cannot be undone.** NetBox removes dependent objects: deleting a
-  device removes its interfaces, power ports, and assigned IPs; deleting a site can
-  remove its racks, devices, and prefixes. `delete` tools carry `destructiveHint: true`
-  and a description that insists on confirming first — but the safe posture for most
-  users is to leave them unregistered.
-- `NETBOX_INSECURE=1` disables TLS certificate validation entirely. Prefer installing
-  your corporate root CA into the system keychain.
-- Never commit a token. `.env` is gitignored; client configs live outside the repo.
+Each tool's description text lives beside its implementation in
+`src/tools/layered/*.ts` — that text is the interface most models actually see, and it is
+reviewed as such.
 
 ---
 
@@ -296,18 +319,17 @@ the registrars generate the five tools. New groups must also be added to
 Issues and pull requests welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 Security vulnerabilities should be reported privately, not as public issues. See
-[SECURITY.md](SECURITY.md), which also covers how to operate this safely (token scoping,
-cascading deletes, and prompt-injection risk with write access).
+[SECURITY.md](SECURITY.md).
 
 ## Disclaimer
 
-This is an independent, community-maintained project. It is not affiliated with,
-endorsed by, or supported by NetBox Labs or the NetBox open-source project. "NetBox" is
-a trademark of its respective owner.
+This is an independent, community-maintained project. It is not affiliated with, endorsed
+by, or supported by NetBox Labs or the NetBox open-source project. "NetBox" is a
+trademark of its respective owner.
 
 Provided as-is under the MIT license. You are responsible for what an AI assistant does
-with the credentials you give it — read the security notes above before granting write
-access to a production NetBox instance.
+with the credentials you give it — read [SECURITY.md](SECURITY.md) before issuing a
+write-enabled token for a production NetBox instance.
 
 ## License
 

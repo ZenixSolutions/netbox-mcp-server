@@ -209,9 +209,26 @@ function insecureGet(
   });
 }
 
-export function defaultCacheDir(env: NodeJS.ProcessEnv = process.env): string {
+export function defaultCacheDir(
+  env: NodeJS.ProcessEnv = process.env,
+  platform: NodeJS.Platform = process.platform,
+): string {
+  // XDG wins everywhere when set, including on Windows and macOS: someone who
+  // has set it has said where they want cache to go.
   const xdg = env["XDG_CACHE_HOME"]?.trim();
   if (xdg) return join(xdg, CACHE_DIR_NAME);
+
+  // Otherwise use each platform's own convention. `~/.cache` works on Windows
+  // and macOS but is not where either puts cache, and a multi-megabyte schema
+  // document in an unexpected place is the kind of thing that never gets
+  // cleaned up.
+  if (platform === "win32") {
+    const localAppData = env["LOCALAPPDATA"]?.trim();
+    if (localAppData) return join(localAppData, CACHE_DIR_NAME, "Cache");
+  }
+  if (platform === "darwin") {
+    return join(homedir(), "Library", "Caches", CACHE_DIR_NAME);
+  }
   return join(homedir(), ".cache", CACHE_DIR_NAME);
 }
 

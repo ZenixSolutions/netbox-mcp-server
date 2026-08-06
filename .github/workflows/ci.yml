@@ -15,12 +15,25 @@ concurrency:
 
 jobs:
   validate:
-    name: validate (node ${{ matrix.node }})
-    runs-on: ubuntu-latest
+    name: ${{ matrix.label }}
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        node: ["20", "22"]
+        # Both supported Node majors on Linux x86, plus one job on every other
+        # platform and architecture we claim to support. Claiming Windows,
+        # macOS or ARM without a runner proving it is how a support matrix
+        # becomes fiction — this repository has already shipped documentation
+        # describing a product that did not exist.
+        #
+        # macos-14 and ubuntu-24.04-arm are ARM64 (Apple silicon, Graviton).
+        include:
+          - { os: ubuntu-latest, node: "20", label: "linux x64 · node 20" }
+          - { os: ubuntu-latest, node: "22", label: "linux x64 · node 22" }
+          - { os: ubuntu-24.04-arm, node: "22", label: "linux arm64 · node 22" }
+          - { os: windows-latest, node: "22", label: "windows x64 · node 22" }
+          - { os: macos-14, node: "22", label: "macos arm64 · node 22" }
+          - { os: macos-13, node: "22", label: "macos x64 · node 22" }
     steps:
       - uses: actions/checkout@v7
 
@@ -35,6 +48,9 @@ jobs:
         run: npm ci
         env:
           NODE_ENV: development
+
+      - name: Report the platform under test
+        run: node -e "console.log(process.platform, process.arch, 'node', process.version)"
 
       - name: Typecheck
         run: npm run typecheck
@@ -58,18 +74,11 @@ jobs:
 
       # The published package is the contract. Verify the CLI contract against
       # the built artifact, not the source tree.
+      #
+      # Written in Node rather than shell so it runs identically on Windows,
+      # where the previous `set -e` / `$?` version would not run at all.
       - name: Smoke test the built binary
-        run: |
-          node dist/index.js --version
-          node dist/index.js --list-tools > /dev/null
-          set +e
-          node dist/index.js --check
-          code=$?
-          set -e
-          if [ "$code" -ne 78 ]; then
-            echo "::error::--check must exit 78 with no configuration, got $code"
-            exit 1
-          fi
+        run: node scripts/smoke-cli.mjs
 
   secrets:
     name: secret scan

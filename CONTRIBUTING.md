@@ -37,44 +37,55 @@ npm run lint           # eslint
 npm run format:check   # prettier --check; `npm run format` fixes
 npm test               # vitest run
 npm run build          # must pass with no TypeScript errors
-npm audit              # should report 0 vulnerabilities
+npm audit              # review new advisories
 ```
+
+`npm audit` is a review step, not a pass/fail gate. The advisories it currently reports
+arrive transitively through `@modelcontextprotocol/sdk` and clear when that dependency
+updates. What matters is that your change introduces none of its own.
 
 And confirm the tool surface still registers as expected:
 
 ```bash
-node dist/index.js --list-tools | wc -l                     # -> 446
-NETBOX_READONLY=1 node dist/index.js --list-tools | wc -l   # -> 179
+node dist/index.js --list-tools
 ```
 
-If your change alters the tool count, update the numbers in `README.md` and
-`AGENTS.md` § 10 to match. Those tables are checked against real output, not estimated —
-please keep them that way.
+That must print exactly five tools — `netbox_global_search`, `netbox_discover`,
+`netbox_describe`, `netbox_read`, `netbox_write` — and needs no credentials. The count
+is a deliberate design property, not an incidental one: adding a sixth tool is an
+architectural change, not a routine addition. Raise it in an issue first.
 
-## Adding a resource
+## Adding an object type
 
-Most resources need no new plumbing. In the relevant `src/tools/*.ts`:
+You almost certainly do not need to. There is no per-resource code and no registration
+step. Object types are **derived at runtime** from the instance's own OpenAPI schema
+(`/api/schema/`), so a NetBox that exposes a resource — including one from a plugin —
+already has it, with no change here and no release.
 
-1. Define a `ResourceDescriptor` — endpoint, singular, plural, description, and the
-   fields to surface in list and detail views.
-2. Define the Zod shapes for the list filters and the create/update body.
-3. Call `registerList` / `registerGet` / `registerCreate` / `registerUpdate` from
-   `src/registrars.ts`.
-4. Add `[endpoint, singular]` to the `RESOURCES` array in `src/tools/deletes.ts` so the
-   resource gets a delete tool too.
+If an object type is missing or resolves badly, the bug is in derivation, under
+`src/schema/`:
 
-Adding a whole new **group** additionally requires adding its name to `ALL_TOOL_GROUPS`
-in `src/gating.ts` and an entry in the `REGISTRARS` table in `src/server.ts`. Forgetting
-the first means `NETBOX_TOOL_GROUPS` silently cannot select it; forgetting the second
-means the group is never registered. `src/index.ts` is argv parsing only — nothing is
-wired there.
+- `loader.ts` fetches and caches the schema document.
+- `registry.ts` builds the `object_type` registry from it and resolves the read, write,
+  and patch component for each entry. Note the invariant it enforces: a write schema is
+  resolved by `$ref` from an operation, **never by component name**, because a name rule
+  resolves to the wrong schema rather than failing. The `writeSchemasResolvedByName`
+  diagnostic must stay at zero.
+- `describe.ts` renders an entry into the field documentation `netbox_describe` returns.
+- `provider.ts` and `types.ts` hold the caching seam and the shared types.
+
+Changes here affect every object type at once, so cover them in `tests/unit/schema-*`
+and check the diagnostics rather than spot-checking one resource. `src/index.ts` is argv
+parsing only — nothing is wired there.
 
 ## Conventions
 
 - Tool descriptions are the model's only documentation — write them for an LLM that has
   never seen NetBox. Say what the tool does, when to use it instead of a neighbouring
   tool, and what the arguments mean in NetBox's terms.
-- Destructive tools must carry `destructiveHint: true` and spell out what cascades.
+- `netbox_write` is separate from `netbox_read` so that `destructiveHint: true` is
+  honest — every call to it can change NetBox. Keep that split, keep the annotations
+  accurate, and keep spelling out what cascades.
 - Never log, echo, or interpolate `NETBOX_TOKEN` into a response or error string.
 - Keep responses under the `CHARACTER_LIMIT` in `src/constants.ts`; use the pagination
   helpers in `src/formatting.ts` rather than truncating by hand.
