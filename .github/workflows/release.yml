@@ -130,11 +130,15 @@ jobs:
       - name: Format check
         run: npm run format:check
 
-      - name: Test
-        run: npm test
-
+      # Build BEFORE test, for the same reason ci.yml does: the packaging
+      # suite asks `npm pack` what would be published, and `files` points at
+      # `dist`. With no build the tarball is documents only. This file kept the
+      # wrong order after ci.yml was fixed, and cost a release run to find.
       - name: Build
         run: npm run build
+
+      - name: Test
+        run: npm test
 
       - name: Smoke test the built binary
         run: |
