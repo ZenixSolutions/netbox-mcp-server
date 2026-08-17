@@ -22,6 +22,7 @@ import type {
   ObjectTypeKey,
   Operation,
 } from "./types.js";
+import { deprecationNote, deprecationsFor } from "./deprecations.js";
 import {
   deref,
   getComponent,
@@ -62,6 +63,25 @@ export const FILTER_GRAMMAR =
   "(case-insensitive exact), `__empty`, `__regex`/`__iregex`; numeric and date filters " +
   "also take `__lt`/`__lte`/`__gt`/`__gte`; a few multi-value filters take `__any`. " +
   "For example `name__ic=core` or `created__gte=2026-01-01`.";
+
+/**
+ * The `brief` parameter is truthiness-tested as a RAW STRING, so every value
+ * that is not empty turns brief mode ON — `brief=0` and `brief=false` included,
+ * because `'0'` and `'false'` are truthy Python strings.
+ *
+ *   netbox/netbox/api/viewsets/__init__.py:
+ *     self.brief = request.method == 'GET' and request.GET.get('brief')
+ *
+ * This is a SOURCE-LEVEL observation against 4.6.8, not documented behaviour —
+ * nothing in the REST API docs says it and it could change without a release
+ * note. It is not a deprecation and it is not per-type, which is why it lives
+ * here as a plain note on `list` rather than in the deprecation table.
+ */
+export const BRIEF_TRUTHINESS_NOTE =
+  "Do NOT send brief=0 or brief=false to turn brief mode OFF: NetBox tests the raw " +
+  'string for truthiness, so ANY non-empty value — including the string "false" — ' +
+  "ENABLES it and you get truncated objects that look like whole ones. Omit the " +
+  "parameter entirely for full objects.";
 
 const MAX_DESCRIPTION_CHARS = 200;
 const MAX_READONLY_NAMES = 12;
@@ -339,8 +359,37 @@ function readOnlyNote(names: string[]): string | undefined {
   return `Read-only, returned by GET but never accepted on write: ${shown.join(", ")}${suffix}.`;
 }
 
+/**
+ * Attach the hand-maintained deprecation table to a derived description.
+ *
+ * The notes go FIRST. A deprecation is the one thing in a describe result that
+ * changes what the caller should do rather than how, and a note buried under
+ * "Read-only, returned by GET but never accepted on write: ..." is a note that
+ * did not get read.
+ *
+ * This ADDS information and nothing else: no field is removed, no operation is
+ * withdrawn, no request is refused. See `deprecations.ts`.
+ */
+function withDeprecations(result: DescribeResult): DescribeResult {
+  const deprecations = deprecationsFor(result.object_type, result.operation);
+  if (deprecations.length === 0) return result;
+  return {
+    ...result,
+    deprecations,
+    notes: [...deprecations.map(deprecationNote), ...result.notes],
+  };
+}
+
 /** Derive the description of one operation on one object type. */
 export function describeObjectType(
+  registry: SchemaRegistry,
+  entry: RegistryEntry,
+  operation: Operation,
+): DescribeResult {
+  return withDeprecations(deriveDescription(registry, entry, operation));
+}
+
+function deriveDescription(
   registry: SchemaRegistry,
   entry: RegistryEntry,
   operation: Operation,
@@ -413,6 +462,7 @@ export function describeObjectType(
     const notes = [
       `${filters.length} filters shown; ${elided} lookup-suffix variants elided.`,
       "Results are paginated: use limit and offset, and brief=true for a compact form.",
+      BRIEF_TRUTHINESS_NOTE,
     ];
     if (filters.some((filter) => filter.name === "q")) {
       notes.push("q is a free-text search across the type's searchable fields.");

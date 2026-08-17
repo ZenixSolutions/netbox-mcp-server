@@ -21,6 +21,13 @@ describing the type.
 - **Interfaces:** use the real hardware names — `GigabitEthernet1/0/1`,
   `Eth1/19`, `xe-0/0/0`, `mgmt0` — never invented ones. They have to match the
   device for cabling and monitoring to line up.
+- **Module bays:** set `name` and `position` on every bay. The `name` is the
+  human label (`Eth1/5`, `Slot 1`, `PSU 1`); the `position` is what `{module}`
+  substitutes into generated interface names, so it is the part that has to be
+  right (`Eth1/5`, `1`, `1`). For a module presenting several ports, the house
+  standard is a `/` separator — `{module}/1` giving `Eth1/5/1`. NetBox's own
+  guide uses `:` instead; the divergence is noted in `modular-hardware.md`. Match
+  an existing convention on the instance over either.
 - **Search before creating.** A second "Rack 12" or a duplicated prefix is
   painful to untangle later, and NetBox will not stop you.
 
@@ -41,20 +48,32 @@ describing the type.
   matters more than the exact hue.
 - Set `vm_role: true` only for roles that virtual machines also use.
 
-## Device vs module vs inventory item vs asset
+## Device vs module vs asset
 
 - **Device** — anything that mounts and has its own network identity and ports:
   switch, router, server, firewall, PDU. Zero-U things like PDUs are still
   devices, with `u_height: 0` on the device type.
-- **Module** — a field-replaceable card in a module bay (line card,
-  supervisor).
-- **Inventory item** — a non-networked sub-component recorded on a device: an
-  SFP in a port, a fan, a PSU. Descriptive, not a full device.
+- **Module** — **any field-replaceable part in a module bay.** Line cards and
+  supervisors, but also transceivers, DACs, breakout optics, PSUs, fans, disks,
+  CPUs, GPUs and memory. A module in a bay is the answer for essentially every
+  sub-component of a device. Parts with ports carry interface templates using
+  the `{module}` token; parts without ports carry a **module type profile** and
+  no component templates at all.
+- **Device bay** — not a module bay. Use it only for hardware with its own
+  management plane isolated from the parent, i.e. blade servers. Never for line
+  cards.
+- **Inventory item** — **deprecated since NetBox 4.3; never create one.** It was
+  the old way to record an SFP, a fan or a PSU on a device. Model those as
+  modules. Existing inventory items stay readable and you should read them
+  freely — audits and migrations need to. See `deprecations.md` for the ban, the
+  four cases where no module equivalent exists, and the migration steps.
 - **Asset** (netbox-inventory) — the _physical unit_ tracked for procurement and
   lifecycle (in stock, RMA, spare, owned by a tenant), independent of whether it
-  is installed. Use assets for stock and spares; use a device/module/inventory
-  item for what is actually racked and cabled. An asset can point at the
-  installed object.
+  is installed. Core NetBox cannot model an uninstalled module — `Module` needs
+  both a device and a bay — so an asset is the only place a spare on a shelf can
+  live. Use assets for stock and spares and a device or module for what is
+  actually racked and cabled; an asset can point at the installed object. Prefer
+  `module_type` as the asset's hardware type over `inventoryitem_type`.
 
 ## Interface types (cheat sheet)
 
@@ -73,6 +92,10 @@ values; these are the ones you will actually propose:
 If you are unsure, ask — the value has to be one NetBox recognises, and
 `netbox_write` will reject anything else locally.
 
+For a pluggable port the `type` goes on the **module type's** interface template,
+not on the device type, and it should describe the **transceiver actually in
+use** rather than the cage — a 10G optic in a SFP+ port is `10gbase-x-sfpp`.
+
 ## Cable types (cheat sheet)
 
 - **Copper Ethernet:** `cat5e`, `cat6`, `cat6a`, `cat7`, `cat8`.
@@ -82,6 +105,11 @@ If you are unsure, ask — the value has to be one NetBox recognises, and
 
 Infer from the ports: short SFP+/SFP28 links are usually `dac-passive`; longer
 or QSFP links are fiber; `1000base-t`/`10gbase-t` are copper.
+
+Leave the cable `profile` unset unless the user has asked for lane-level tracing
+of a breakout. It is optional, and omitting it keeps the familiar tracing
+behaviour. When it is wanted, read the enum from `netbox_describe` — there are 26
+values and the NetBox docs list 4.
 
 ## IP and prefix hygiene
 
@@ -102,6 +130,10 @@ Keep VIDs consistent with any site scheme already in use. Put VLANs in a VLAN
 group scoped to the site or fabric so VIDs are unique where they need to be,
 give operational VLANs an `ipam.role` (OOBM, Prod, DMZ) for filtering, and
 create the matching prefix with its `vlan` set.
+
+The group is now the standard route: assigning a VLAN directly to a `site` was
+deprecated in 4.4 and a group can span multiple sites, which direct assignment
+cannot.
 
 ## Tenancy
 

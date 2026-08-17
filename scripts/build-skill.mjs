@@ -1,10 +1,19 @@
 #!/usr/bin/env node
 /**
- * Package a skill directory into a `.skill` file for delivery to a user.
+ * Package a skill directory into the two artifacts a release ships.
  *
- * A `.skill` file is a zip archive whose entries are prefixed with the skill's
- * own directory name (`netbox-modeling/SKILL.md`, …), which is the layout a
- * client expects when it unpacks one.
+ * 1. `dist/skills/<name>.skill` — a zip archive whose entries are prefixed with
+ *    the skill's own directory name (`netbox-modeling/SKILL.md`, …), which is
+ *    the layout a client expects when it unpacks one. This is what a user
+ *    installs into a skills directory.
+ *
+ * 2. `dist/skills/<name>.md` — the same source flattened into one document:
+ *    `SKILL.md` first, then every `references/*.md` inline under its own
+ *    heading, with the cross-references between them rewritten to in-document
+ *    anchors. This is what gets uploaded to a surface that takes a single
+ *    knowledge file rather than a skill folder.
+ *
+ * Both come from the same tree, so they cannot disagree.
  *
  * DEPENDENCY-FREE ON PURPOSE. This repository ships an MCP server; adding an
  * archiver to its dev dependencies to produce one zip a release is a poor
@@ -21,7 +30,7 @@
  *   npm run build:skill
  *
  * Exit codes:
- *   0  the .skill file was written
+ *   0  both artifacts were written
  *   1  validation failed
  *   2  usage error — no such skill directory
  */
@@ -260,6 +269,195 @@ function validate(skillName, skillDir, files) {
 }
 
 // ---------------------------------------------------------------------------
+// Flattened single-file document
+// ---------------------------------------------------------------------------
+
+/**
+ * The skill's progressive disclosure is a feature in a client that can read a
+ * folder on demand, and an obstacle on a surface that accepts one file. The
+ * flattened build exists for the second case: same words, one document.
+ *
+ * Two things have to be fixed up on the way in, or the result is subtly wrong
+ * rather than merely long:
+ *
+ *   - A reference file opens with its own `#` title. Six H1s in one document
+ *     is not a document, so every heading in a reference is demoted one level
+ *     and its title becomes the section heading.
+ *   - The files point at each other by relative path (`references/build-order.md`).
+ *     In a single file that path resolves to nothing, so each mention is
+ *     rewritten to an anchor that exists in the same document.
+ *
+ * Both rewrites skip fenced code blocks, where a leading `#` is a shell
+ * comment and a path is a literal the reader is meant to copy.
+ */
+
+/** `references/build-order.md` → `ref-build-order`; `SKILL.md` → `skill-md`. */
+function anchorFor(relativePath) {
+  if (relativePath === "SKILL.md") return "skill-md";
+  const base = path.basename(relativePath, ".md");
+  return `ref-${base}`;
+}
+
+function stripFrontmatter(text) {
+  return text.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n/, "");
+}
+
+/** The first `# Title` line, or undefined. */
+function firstHeading(text) {
+  const match = /^#[ \t]+(.+?)[ \t]*$/m.exec(text);
+  return match ? match[1] : undefined;
+}
+
+/** Drop the leading `# Title` line and any blank lines that followed it. */
+function stripFirstHeading(text) {
+  return text.replace(/^#[ \t]+.+?[ \t]*\r?\n(?:[ \t]*\r?\n)*/, "");
+}
+
+/**
+ * Apply `transform` to every line that is not inside a fenced code block.
+ *
+ * A fence is ``` or ~~~ at the start of a line; the fence lines themselves are
+ * left alone, which is what keeps a ```` ```json ```` info string intact.
+ */
+function mapProseLines(text, transform) {
+  let inFence = false;
+  return text
+    .split("\n")
+    .map((line) => {
+      if (/^\s*(?:```|~~~)/.test(line)) {
+        inFence = !inFence;
+        return line;
+      }
+      return inFence ? line : transform(line);
+    })
+    .join("\n");
+}
+
+/** `## Contents` → `### Contents`, capped at H6, prose lines only. */
+function demoteHeadings(text) {
+  return mapProseLines(text, (line) =>
+    line.replace(/^(#{1,6})([ \t]+)/, (whole, hashes, space) =>
+      hashes.length < 6 ? `#${hashes}${space}` : whole,
+    ),
+  );
+}
+
+/**
+ * Rewrite every mention of another file in the skill to an in-document anchor.
+ *
+ * `targets` maps a relative path (`references/build-order.md`) to its anchor.
+ * A mention of something not in that map is left exactly as it was: an unknown
+ * path is a bug in the skill, and silently linking it somewhere would hide it.
+ *
+ * Three forms are handled, in this order, because each pass has to not undo
+ * the previous one:
+ *   1. `[text](references/foo.md)`      → `[text](#ref-foo)`
+ *   2. `` `references/foo.md` ``        → `` [`references/foo.md`](#ref-foo) ``
+ *   3. bare `references/foo.md`         → `[references/foo.md](#ref-foo)`
+ */
+function rewriteCrossReferences(text, targets) {
+  const resolve = (raw) => targets.get(raw.replace(/^\.\//, ""));
+
+  return mapProseLines(text, (line) => {
+    let out = line;
+
+    // 1. Existing markdown links.
+    out = out.replace(
+      /\[([^\]]*)\]\((\.?\/?(?:references\/)?[A-Za-z0-9_-]+\.md)(#[^)]*)?\)/g,
+      (whole, label, target) => {
+        const anchor = resolve(target);
+        return anchor ? `[${label}](#${anchor})` : whole;
+      },
+    );
+
+    // 2. Code spans. Skip one already sitting in a link's label, which pass 1
+    //    may just have produced, or the source may have written by hand.
+    out = out.replace(
+      /`(\.?\/?(?:references\/)?[A-Za-z0-9_-]+\.md)`(\]\()?/g,
+      (whole, target, followedByLink) => {
+        if (followedByLink) return whole;
+        const anchor = resolve(target);
+        return anchor ? `[\`${target}\`](#${anchor})` : whole;
+      },
+    );
+
+    // 3. Bare mentions. The lookbehind keeps this off anything the passes
+    //    above produced, and off a path that is part of a longer token.
+    out = out.replace(
+      /(?<![[\w`/.-])(\.?\/?(?:references\/[A-Za-z0-9_-]+|SKILL)\.md)(?![\w`)])/g,
+      (whole, target) => {
+        const anchor = resolve(target);
+        return anchor ? `[${target}](#${anchor})` : whole;
+      },
+    );
+
+    return out;
+  });
+}
+
+/**
+ * Build the flattened document.
+ *
+ * `files` is the same list the archive is built from, so the two artifacts
+ * always describe the same tree. Anything that is not markdown cannot be
+ * inlined; it is named in a closing note rather than dropped in silence.
+ */
+function buildFlattenedDocument(skill, skillDir, files) {
+  const markdown = files.filter((f) => f.endsWith(".md"));
+  const others = files.filter((f) => !f.endsWith(".md"));
+  const references = markdown.filter((f) => f !== "SKILL.md").sort();
+
+  const targets = new Map(
+    [...markdown].map((relative) => [relative, anchorFor(relative)]),
+  );
+
+  const read = (relative) => readFileSync(path.join(skillDir, relative), "utf8");
+  const section = (body) => rewriteCrossReferences(body, targets).trim();
+
+  const parts = [
+    `<!--`,
+    `  ${skill} — every file of skills/${skill}/ flattened into one document.`,
+    `  Generated by scripts/build-skill.mjs. Do not edit; edit the skill instead.`,
+    `  Sources, in order: ${[...markdown.filter((f) => f === "SKILL.md"), ...references].join(", ")}`,
+    `-->`,
+    ``,
+    `<a id="${anchorFor("SKILL.md")}"></a>`,
+    ``,
+    section(stripFrontmatter(read("SKILL.md"))),
+  ];
+
+  for (const relative of references) {
+    const body = read(relative);
+    const title = firstHeading(body) ?? path.basename(relative, ".md");
+    parts.push(
+      ``,
+      `---`,
+      ``,
+      `<a id="${anchorFor(relative)}"></a>`,
+      ``,
+      `## ${relative} — ${title}`,
+      ``,
+      section(demoteHeadings(stripFirstHeading(body))),
+    );
+  }
+
+  if (others.length > 0) {
+    parts.push(
+      ``,
+      `---`,
+      ``,
+      `## Files not included above`,
+      ``,
+      `These ship in ${skill}.skill but are not markdown, so they cannot be inlined here:`,
+      ``,
+      ...others.map((relative) => `- \`${relative}\``),
+    );
+  }
+
+  return `${parts.join("\n").trimEnd()}\n`;
+}
+
+// ---------------------------------------------------------------------------
 // Entry point
 // ---------------------------------------------------------------------------
 
@@ -319,15 +517,24 @@ function main() {
   });
 
   const archive = buildZip(entries);
+  const flattened = Buffer.from(buildFlattenedDocument(skill, skillDir, files), "utf8");
+
   mkdirSync(outDir, { recursive: true });
-  const outPath = path.join(outDir, `${skill}.skill`);
-  writeFileSync(outPath, archive);
+  const archivePath = path.join(outDir, `${skill}.skill`);
+  const flattenedPath = path.join(outDir, `${skill}.md`);
+  writeFileSync(archivePath, archive);
+  writeFileSync(flattenedPath, flattened);
 
   const uncompressed = entries.reduce((total, entry) => total + entry.data.length, 0);
+  const markdownCount = files.filter((f) => f.endsWith(".md")).length;
+
   console.error(`Packaged ${entries.length} file(s) from skills/${skill}/:`);
   for (const entry of entries) console.error(`  ${entry.name}`);
   console.error(
-    `Wrote ${path.relative(repoRoot, outPath)} — ${archive.length} bytes (from ${uncompressed}).`,
+    `Wrote ${path.relative(repoRoot, archivePath)} — ${archive.length} bytes (from ${uncompressed}).`,
+  );
+  console.error(
+    `Wrote ${path.relative(repoRoot, flattenedPath)} — ${flattened.length} bytes (${markdownCount} markdown file(s) flattened).`,
   );
   process.exit(EXIT_OK);
 }

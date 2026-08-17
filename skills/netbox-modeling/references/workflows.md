@@ -19,17 +19,26 @@ The most common request: "connect X to Y", "patch this into that".
    `filters: {device_id: <id>, name: "<port>"}` for each side. For a patch-panel
    port use `dcim.frontport` / `dcim.rearport`; for console or power, the
    matching component type. Capture each port's numeric id.
-2. **Check occupancy.** Each port's `cable` field is non-null if it is already
+2. **If either interface is missing, check for a module bay before creating
+   one.** Read `dcim.modulebay` with `filters: {device_id: <id>}`. A bay with no
+   module is an empty cage, and the interface is supposed to come from the optic
+   — do **not** hand-create an interface to cable to. Run the transceiver
+   playbook below for that side first, in the same plan, and come back with the
+   generated interface's id.
+3. **Check occupancy.** Each port's `cable` field is non-null if it is already
    connected. If so, stop and tell the user — the existing cable must be deleted
    first, which is its own confirmed delete.
-3. **Describe `dcim.cable` for `create`** once.
-4. **Ask only what is missing:** cable `type`, and optionally `length` +
+4. **Describe `dcim.cable` for `create`** once.
+5. **Ask only what is missing:** cable `type`, and optionally `length` +
    `length_unit`, `label`, `color`, `status`. Infer `type` from the ports where
    you can: a 1000base-t port is copper (`cat6`), a short SFP+ link is usually
-   `dac-passive`, a long or QSFP link is fiber.
-5. **Plan and confirm:** "Cable dc1-leaf-01 `Eth1/19` (dcim.interface id 79) to
-   dc1-fw-01 `xe-0/0/3` (id 85), type `mmf-om4`, status connected."
-6. **Write:**
+   `dac-passive`, a long or QSFP link is fiber. Leave `profile` unset unless the
+   user asked for lane-level tracing of a breakout.
+6. **Plan and confirm:** "Cable dc1-leaf-01 `Eth1/19` (dcim.interface id 79) to
+   dc1-fw-01 `xe-0/0/3` (id 85), type `mmf-om4`, status connected." Any module
+   installs needed to make those interfaces exist go in the same plan, ahead of
+   the cable.
+7. **Write:**
 
    ```json
    {
@@ -44,7 +53,68 @@ The most common request: "connect X to Y", "patch this into that".
    }
    ```
 
-7. **Verify:** read the cable back; both ports now show it.
+8. **Verify:** read the cable back; both ports now show it.
+
+Cables terminate on interfaces only. `dcim.module` and `dcim.modulebay` are not
+termination types, and `dcim.cabletermination` is read-only from NetBox 4.5 —
+terminations go on the cable.
+
+## Installing a transceiver, DAC, breakout optic or line card
+
+"Put a 10G SFP in port 5", "add a line card to slot 2", "we fitted a QSFP
+breakout". Read `modular-hardware.md` first if you have not this session.
+
+1. **Resolve the device** → id, then read **both** `dcim.modulebay` and
+   `dcim.interface` for it. What you find decides the shape of the job:
+   - **An empty bay at the right position** — the normal case. Go to step 2.
+   - **A static interface and no bay** — the device type models that port as
+     fixed. Converting it means creating a bay and deleting the interface, and
+     deleting any cable on it first. Both are destructive; present the cost and
+     let the user choose rather than doing it silently.
+   - **Neither** — the device type needs a `dcim.modulebaytemplate` (for the
+     whole fleet) or the device needs a `dcim.modulebay` (for this one unit).
+     Say which you are proposing and why.
+2. **Resolve or create the module type.** Read `dcim.moduletype` filtered by
+   `model` / `manufacturer_id` — one module type per optic model, reused across
+   the fleet. If it is missing: create the `dcim.moduletype`, then its
+   `dcim.interfacetemplate` entries with `module_type` set —
+   - one template named exactly `{module}` for a single-port optic or DAC,
+   - `{module}/1` … `{module}/N` for a breakout optic,
+   - `eth/{module}/1` … `eth/{module}/48` for a line card.
+     Set each template's `type` to the transceiver in use, not the cage.
+3. **Check the bay's `position` is set** before installing anything. A blank
+   position produces a mangled interface name with no error. Fix it with an
+   `update` on `dcim.modulebay` if it is empty.
+4. **Plan and confirm:** the module type (new or existing), the bay by name
+   **and position**, the module, and the interface names you expect to appear.
+5. **Create the `dcim.module`** with `device`, `module_bay`, `module_type`, plus
+   `serial` / `asset_tag` if known.
+6. **Verify by reading the interfaces back** and using the names and ids you
+   actually got — do not assume the substitution came out as planned.
+
+## A part with no ports (PSU, fan, disk, CPU, GPU, memory)
+
+Same shape, minus the templates.
+
+1. **Read `dcim.moduletypeprofile`.** NetBox 4.6 ships `Fan`, `Power Supply`,
+   `Hard Disk`, `CPU`, `GPU`, `Memory` and `Expansion Card` — reuse one rather
+   than creating a profile.
+2. **Create the `dcim.moduletype`** with manufacturer, model, part number and
+   `profile`, and **no component templates at all**.
+3. **Create the `dcim.modulebay`** on the device for the physical slot — PSU bay,
+   fan tray, drive bay. **Name it in the plan:** this is a new object the user's
+   model did not have before, and every module needs one.
+4. **Create the `dcim.module`** with `replicate_components: false`.
+
+## Migrating inventory items to modules
+
+Only when asked. Full procedure and the four cases where you must stop and ask
+are in `deprecations.md`. In short: read the existing `dcim.inventoryitem`
+records, check them against the four gaps (`discovered`, per-instance role, a
+`component` link to a fixed port, spares with no device), create profile → module
+type → module bay → module, carry `serial` and `asset_tag` across, and delete the
+inventory item last with explicit confirmation — or leave it in place if the user
+prefers.
 
 ## Adding a device (racking and NICs)
 
@@ -62,7 +132,10 @@ The most common request: "connect X to Y", "patch this into that".
 4. **Interfaces:** ask how many and their names/types unless the user already
    said. If the device type has interface templates, NetBox creates the ports
    automatically on device creation — read the device's interfaces after
-   creating it and add only what is missing.
+   creating it and add only what is missing. If the device type has module bay
+   templates, the device gets **bays**, not interfaces, for those ports; the
+   interfaces appear when the optics are installed. Ask which cages are
+   populated rather than creating interfaces for empty ones.
 5. **Plan and confirm** the device plus every interface, with resolved ids.
 6. **Write in order:** device → capture `id` → each interface with
    `device: <that id>`. Create a LAG interface before its members, then set each
@@ -80,6 +153,13 @@ The most common request: "connect X to Y", "patch this into that".
    `dcim.powerporttemplate`, `dcim.consoleporttemplate` and friends make every
    future device of this model inherit its ports. Worth doing for a model the
    user will deploy repeatedly; it is a separate batch of creates, so ask first.
+5. **Split fixed ports from pluggable ones.** Ask which ports are hard-wired and
+   which take an optic or a card. Fixed ports get `dcim.interfacetemplate`;
+   pluggable cages get `dcim.modulebaytemplate` with a `name` and a `position`,
+   and no interface template — the interface comes from the module. A chassis
+   switch gets bays only and no interfaces at all. Getting this split right at
+   device-type time is what stops every future device of the model needing
+   surgery.
 
 ## Adding NICs to an existing device
 
@@ -143,9 +223,12 @@ forward. One describe per tier.
 
 1. **Confirm the plugin exists:** `netbox_discover {app: "plugins/inventory"}`.
 2. **Resolve or choose the hardware type** — exactly one of `device_type`,
-   `module_type`, `inventoryitem_type`, `rack_type`. Small parts (SFPs, cables)
-   are usually an inventory item type; resolve or create
-   `plugins.inventory.inventoryitemtype` first.
+   `module_type`, `inventoryitem_type`, `rack_type`. Small installable parts
+   (SFPs, PSUs, line cards) are a **`module_type`**: resolve or create
+   `dcim.moduletype` first, so that installing the asset later links it to a
+   `dcim.module`. `inventoryitem_type` assets install onto deprecated
+   `dcim.inventoryitem` objects — avoid it for anything that will end up in a
+   device.
 3. **Optionally resolve** supplier, purchase, delivery, storage location, owning
    tenant, asset role.
 4. **Ask:** `serial` and/or `asset_tag`, `status`, and how many.
@@ -178,6 +261,9 @@ locations, racks, devices, interfaces, cables and prefixes.
 2. **Work out the blast radius** and tell the user. Read the dependent
    collections — devices in the rack, prefixes scoped to the site — and say how
    many objects are at risk. Do not present a delete as a small change.
+   **Deleting a module deletes the interfaces it generated**, and with them any
+   cables and IP assignments on those interfaces. "Pull the optic" is not a small
+   change either; list what goes with it.
 3. **Get explicit confirmation from the user**, naming the object.
 4. **Write:** `{object_type, operation: "delete", id, confirm: "<display>"}`.
    `confirm` must match the current `display` exactly; a mismatch is refused and

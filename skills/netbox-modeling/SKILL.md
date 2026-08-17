@@ -2,17 +2,19 @@
 name: netbox-modeling
 description: >-
   Model and build out infrastructure in NetBox through the five netbox MCP tools
-  — sites, racks, hardware (manufacturers, device types, platforms), devices,
-  NICs/interfaces, cables and wired connections, IPAM (prefixes, IP addresses,
-  VLANs, VLAN groups, VRFs, aggregates, IP ranges), tenancy, virtualization, and
-  whatever plugins the instance has installed (netbox-inventory assets,
-  suppliers, purchases, deliveries). Use this skill whenever the user wants to
-  add, create, model, document, wire, cable, connect, rack, provision, lay out,
-  update or remove ANYTHING in NetBox — even if they don't say "NetBox"
-  explicitly but are clearly describing network/datacenter hardware, cabling, or
-  IP addressing that belongs in it. It knows the order things must be built in,
-  asks only for what it genuinely needs, recommends standard-practice defaults,
-  previews a plan before writing, and never guesses a field name it can look up.
+  — sites, racks, hardware (manufacturers, device types, module types,
+  platforms), devices, interfaces, modules and module bays (transceivers, SFPs,
+  breakouts, line cards, PSUs), cables and wired connections, IPAM (prefixes, IP
+  addresses, VLANs, VLAN groups, VRFs, aggregates, IP ranges), tenancy,
+  virtualization, and the instance's installed plugins (netbox-inventory assets,
+  suppliers, purchases, deliveries). Use this skill
+  whenever the user wants to add, create, model, document, wire, cable, connect,
+  rack, provision, lay out, update or remove ANYTHING in NetBox — even if they
+  don't say "NetBox" explicitly but are clearly describing network/datacenter
+  hardware, cabling, or IP addressing that belongs in it. It knows the order
+  things must be built in and which models are deprecated, asks only for what it
+  genuinely needs, recommends standard defaults, previews a plan before writing,
+  and never guesses a field name it can look up.
 ---
 
 # NetBox modeling
@@ -43,8 +45,15 @@ The whole NetBox API is reached through five tools. There is no
 `netbox_discover` and `netbox_describe` are generated from the connected
 instance's own OpenAPI schema, so they describe **that** instance — its NetBox
 version, its plugins, its custom fields. Nothing in this skill overrides what
-they return. If this skill and `netbox_describe` disagree, `netbox_describe` is
-right.
+they return. If this skill and `netbox_describe` disagree about what the API
+**accepts**, `netbox_describe` is right.
+
+What the schema cannot tell you is what you should not write. NetBox emits no
+deprecation signal — no header, no `deprecated: true` — so a deprecated model or
+field is indistinguishable from a current one in anything derived from it. Any
+deprecation note you see in `netbox_describe` output is hand-maintained and
+advisory; it does not block the write. `references/deprecations.md` carries the
+reasoning behind those notes and the cases a per-field note cannot express.
 
 ## The loop
 
@@ -122,11 +131,37 @@ ids, so the user has a record and can spot anything wrong.
   `last_updated`, every `*_count`, and per-type computed fields like
   `dcim.interface.mac_address`. `netbox_describe` lists them; `netbox_write`
   rejects them.
+- **Never create an inventory item.** `dcim.inventoryitem`,
+  `dcim.inventoryitemrole` and `dcim.inventoryitemtemplate` were deprecated in
+  4.3 in favour of modules. Reading them is fine and necessary; creating one is
+  not. See `references/deprecations.md`.
 - **Slugs:** when a create needs a slug and the user did not give one, derive it
   from the name (lowercase, spaces and dots to hyphens, drop other punctuation)
   and show it in the plan so they can correct it.
 - **Surface API errors verbatim.** A NetBox 400 names the offending field.
   Relay it rather than paraphrasing it away.
+
+## Modular hardware — three invariants
+
+These change the default answer to two of the most common requests, "add an SFP
+to port 5" and "cable these two switches together". Read
+`references/modular-hardware.md` before either.
+
+**1. An `Interface` never holds a module.** A transceiver, DAC or line card is
+never a property of an interface and never a child of one. There is no field to
+put it in, and looking for one means the model is wrong.
+
+**2. Modules generate interfaces.** A physically pluggable port is **not** a
+static interface template on the baseline Device Type. The Device Type carries a
+**Module Bay**; the **Module Type** carries an interface template using the
+`{module}` token; the interface exists only once a module is instantiated into
+that bay. `{module}` is replaced by the module bay's **`position`**, not its
+`name` — set both on every bay, or the token resolves to nothing and the
+generated name is silently wrong.
+
+**3. Cables terminate on `Interfaces` only** — never on a Module or a Module
+Bay. So the module install always precedes the cable: until the module exists,
+the interface it would terminate on does not.
 
 ## Dependency order (build bottom-up)
 
@@ -146,16 +181,30 @@ RIR ─▶ Aggregate                         IPAM Role ─▶ (prefix / vlan / i
 Tenant Group ─▶ Tenant ─▶ (almost anything .tenant)
 
 netbox-inventory plugin:  Supplier ─▶ Purchase ─▶ Delivery ─▶ Asset
-                          Manufacturer ─▶ Inventory Item Type ─▶ Asset
+                          Manufacturer ─▶ Module Type ─▶ Asset
+```
+
+Modular hardware — a pluggable port, a transceiver, a line card, a PSU — takes
+the same route to an Interface, one step further back:
+
+```
+Module Type Profile ─┐
+Manufacturer ────────┴─▶ Module Type ─▶ Interface Template  (name contains {module})
+                              │
+Device Type ─▶ Module Bay Template ─▶ Module Bay ─▶ Module ─▶ Interface ─▶ Cable
+                                     (name + position)  ▲
+                                                        └── module_type
 ```
 
 Items on the left must exist before items on the right can reference them. Names
 in parentheses are the field on the right-hand object that holds the reference.
 
-Two orderings that are easy to get wrong:
+Orderings that are easy to get wrong:
 
 - A **cable** goes last. Both terminations must already exist, and an occupied
   termination cannot take a second cable.
+- A **module install goes before the cable**, on both ends, because it is what
+  creates the interfaces the cable terminates on.
 - A device's **primary IP** is set after the fact: create the interface, create
   the IP assigned to that interface, then `update` the device with
   `primary_ip4`/`primary_ip6`.
@@ -170,10 +219,22 @@ Two orderings that are easy to get wrong:
   `scope_type`/`scope_id`, rack `form_factor`, VLAN group `vid_ranges`, cable
   terminations, MAC addresses). Read the relevant section before building a type
   you are not certain about.
+- **`references/modular-hardware.md`** — the three invariants in full, the
+  `{module}` token and the `position` trap, the three patterns (single
+  pluggable, breakout optic, chassis line card), nested bays, cabling through a
+  module, and breakout optic vs breakout cable profile. Read this before
+  modelling any transceiver, DAC, line card, PSU or breakout, and before cabling
+  a pluggable port.
+- **`references/deprecations.md`** — what NetBox still accepts but you must not
+  write: the inventory item ban and what to model instead, the four gaps where
+  no replacement exists and you must stop and ask, the writes that return 200
+  and do nothing, and the fields removed in 4.x. There is no deprecation signal
+  in the API, so `netbox_describe` cannot warn you about any of this.
 - **`references/workflows.md`** — step-by-step playbooks for the common jobs:
-  cabling two endpoints, adding a device with NICs, modeling new hardware,
+  cabling two endpoints, installing a transceiver or line card, adding a device
+  with NICs, modeling new hardware, migrating inventory items to modules,
   allocating IPs, VLANs and prefixes, rack intake, asset intake, bulk creation,
   and deletion. Follow the matching playbook rather than improvising.
 - **`references/conventions.md`** — the defaults to recommend: naming, slugs,
   statuses, role colors, interface and cable type values, IP and prefix hygiene,
-  and when to use a device vs module vs inventory item vs asset.
+  and when to use a device vs module vs asset.

@@ -10,7 +10,99 @@ surface may change in a minor release, with the change noted here.
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+- **NetBox deprecation warnings, surfaced through `netbox_describe`**
+  (`src/schema/deprecations.ts`). NetBox emits no machine-readable deprecation
+  signal — no `Deprecation` or `Sunset` header, no `deprecated: true` anywhere
+  in the OpenAPI document, for any deprecated model. Verified against 4.6.8. A
+  client cannot detect any of it at runtime, which is why this one table is
+  hand-maintained while the rest of the layer is derived.
+
+  It is **advisory only**. Nothing is blocked, nothing is refused, and there is
+  no switch to turn it into a gate. Write access remains the NetBox token's
+  `write_enabled` flag and object permissions, enforced by NetBox where no tool
+  argument can reach them.
+
+  Covered: `dcim.inventoryitem`, `dcim.inventoryitemrole` and
+  `dcim.inventoryitemtemplate` (deprecated 4.3, #19004, still full CRUD in
+  4.6.8 — and note that **5.0 appears only in the tracking issue**: the release
+  notes and all three model docs say "a future NetBox release", so the note
+  says that too); `dcim.interface.mac_address` and
+  `virtualization.interface.mac_address`; `ipam.vlan.site` (deprecated 4.4,
+  **no removal version announced at all**); `dcim.module.local_context_data`
+  (removed in a _patch_ release, 4.6.3); `dcim.frontport.rear_port` and
+  `rear_port_position` (removed 4.5 for `PortMapping`); writes to
+  `dcim.cabletermination` (405 since 4.5); and v1 API tokens.
+
+  Deprecations appear on **read** operations as well as writes — a caller
+  enumerating inventory items in order to migrate off them should be told why.
+
+- The modular-hardware modelling doctrine, and a deprecations reference, in the
+  `netbox-modeling` skill. Modules generate interfaces; interfaces never hold
+  modules; cables terminate only on interfaces, so the module install precedes
+  the cable. Covers the `{module}` / `{module}/N` / `eth/{module}/N` patterns —
+  including that **`{module}` substitutes the module bay's `position`, not its
+  `name`**, which is the difference between `eth/1/1` and an interface named
+  after nothing — nested bays (4.6, #19796), and the distinction between a
+  breakout _optic_ (a module with several interface templates) and a breakout
+  _cable_ (`dcim.cable` with a `profile`, 26 values in 4.6.8 against 4 in the
+  model doc, so take the enum from `netbox_describe`).
+
+  The skill now forbids **creating** inventory items and models the same
+  hardware as modules in module bays, with module type profiles for parts that
+  have no components — 4.6 ships `Fan`, `Power Supply`, `Hard Disk`, `CPU`,
+  `GPU` and `Memory` profiles by default. **Reading existing inventory items
+  stays allowed**, because migrating off them requires enumerating them first.
+  Where NetBox has no replacement — `discovered`, per-instance roles, the
+  `component` generic FK for a transceiver in a fixed port, and a spare part on
+  a shelf — the skill stops and asks rather than inventing an answer.
+
+- Distribution as a plugin: `.claude-plugin/marketplace.json` and
+  `.claude-plugin/plugin.json` bundle the skill and the MCP server together, and
+  `docs/installing-the-skill.md` gives per-surface steps for Claude, ChatGPT
+  desktop (`~/.codex/config.toml`, skills in `~/.agents/skills/`) and Grok Build
+  (`~/.grok/config.toml`, which also reads Claude Code config unmodified).
+  `npm run build:skill` now emits a flattened single-file Markdown render
+  alongside the `.skill` archive, for surfaces that take an uploaded document
+  rather than a skill directory.
+
+  What updates and what does not is stated plainly rather than implied: Claude
+  plugins check at session start, third-party marketplaces default to
+  auto-update **off**, and nothing else updates at all. ChatGPT Scheduled Tasks
+  and Grok Automations can report that a document changed but cannot write back
+  to stored skills or instructions, so a weekly _alarm_ is possible and a weekly
+  _refresh_ is not.
+
+### Fixed
+
+- **`netbox_read` could send `brief=false`, which turns brief mode ON.** NetBox
+  tests the raw query string for truthiness — `request.GET.get('brief')` — and
+  `'false'` and `'0'` are truthy Python strings, so absence is the only "off".
+  A model asking for complete objects wrote the obvious `{ brief: false }` and
+  received the compact form: a well-formed object with most of its fields
+  missing, HTTP 200, and nothing in the response saying it had been truncated.
+  A caller could then report a field as absent from NetBox and be wrong.
+
+  This is the same failure shape as the misspelled filter the live contract run
+  found — the request succeeds and the answer is not what was asked for — and it
+  is caught the same way, before the request leaves the process. `brief` is now
+  translated rather than forwarded: falsey values drop the parameter, truthy
+  ones send the canonical `true`. Real boolean filters such as `enabled=false`
+  are untouched. The underlying behaviour is a source-level reading of 4.6.8 and
+  is not documented, so the tests pin our translation rather than NetBox's
+  parsing.
+
+- `netbox_describe`'s `structuredContent` omitted the new `deprecations` array,
+  so a client reading the structured channel rather than the rendered Markdown
+  would have seen none of it.
+
+- Eight claims in the `netbox-modeling` skill that a 4.6.8 audit refuted,
+  including "a front port requires the rear port it maps to" (`rear_port` was
+  removed in 4.5), the asset-intake instruction to model SFPs and cables as
+  inventory item types, and "if this skill and `netbox_describe` disagree,
+  `netbox_describe` is right" — still true about what the API _accepts_, false
+  about what you should _write_, since the schema cannot signal deprecation.
 
 ## [0.1.3] - 2026-08-05
 

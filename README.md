@@ -95,6 +95,29 @@ Then ask your assistant: _"Using the netbox tools, list the first 5 sites."_
 
 ---
 
+## Installing the skill as well
+
+The quick start above installs the tools. The `netbox-modeling` skill installs the
+judgement that drives them — build order, required fields, deprecated models, and a
+plan you confirm before anything is written.
+
+[**docs/installing-the-skill.md**](docs/installing-the-skill.md) is the per-surface
+page, with exact paths and config blocks for all three places this server runs:
+
+- **Claude** (Desktop, Code, Cowork) — one step for both halves:
+  `/plugin marketplace add ZenixSolutions/netbox-mcp-server` then
+  `/plugin install netbox-mcp@zenix-solutions`. The plugin carries the server config
+  and the skill, and prompts for the URL and token.
+- **ChatGPT desktop** (a Codex host) — TOML at `~/.codex/config.toml`, skill in
+  `~/.agents/skills/`.
+- **Grok Build** (xAI's local agent) — TOML at `~/.grok/config.toml`, skill in
+  `~/.grok/skills/`; it also reads the Claude plugin above with no configuration.
+
+That page also covers what updates itself and what does not — briefly: Claude plugins
+do, at session start; nothing else does.
+
+---
+
 ## The five tools
 
 | Tool                   | What it does                                                                                                                                  |
