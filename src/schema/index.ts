@@ -23,7 +23,13 @@ export {
   type SchemaLoader,
   type SchemaLoaderOptions,
 } from "./loader.js";
-export { FILTER_GRAMMAR } from "./describe.js";
+export { BRIEF_TRUTHINESS_NOTE, FILTER_GRAMMAR } from "./describe.js";
+export {
+  DEPRECATIONS,
+  deprecationNote,
+  deprecationsFor,
+  VERIFIED_AGAINST,
+} from "./deprecations.js";
 export {
   buildRegistry,
   formatDiagnostics,

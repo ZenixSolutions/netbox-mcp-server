@@ -31,13 +31,15 @@ RFC-003, Open Question 3, records this decision.
 Turns a human request ("rack this switch and cable it") into the right sequence
 of `netbox_discover` → `netbox_describe` → `netbox_read`/`netbox_write` calls.
 
-| File                         | Contents                                                           |
-| ---------------------------- | ------------------------------------------------------------------ |
-| `SKILL.md`                   | The loop, the golden rules, and the conventional build order       |
-| `references/tool-surface.md` | Exact argument shapes, filters, pagination, round-trip economics   |
-| `references/build-order.md`  | Per object type: required fields, enums, references, version traps |
-| `references/workflows.md`    | Playbooks: cabling, device intake, IPAM, bulk creation, deletion   |
-| `references/conventions.md`  | Defaults worth recommending: naming, statuses, types, IP hygiene   |
+| File                             | Contents                                                             |
+| -------------------------------- | -------------------------------------------------------------------- |
+| `SKILL.md`                       | The loop, the golden rules, and the conventional build order         |
+| `references/tool-surface.md`     | Exact argument shapes, filters, pagination, round-trip economics     |
+| `references/build-order.md`      | Per object type: required fields, enums, references, version traps   |
+| `references/modular-hardware.md` | Module bays, modules, `{module}` substitution, breakouts, line cards |
+| `references/deprecations.md`     | What NetBox still accepts but nothing should write                   |
+| `references/workflows.md`        | Playbooks: cabling, device intake, IPAM, bulk creation, deletion     |
+| `references/conventions.md`      | Defaults worth recommending: naming, statuses, types, IP hygiene     |
 
 The reference files are progressive disclosure: `SKILL.md` is always loaded, the
 rest are read on demand for the task at hand.
@@ -48,14 +50,26 @@ rest are read on demand for the task at hand.
 npm run build:skill
 ```
 
-Writes `dist/skills/netbox-modeling.skill` — a zip archive of
-`skills/netbox-modeling/`, which is what a user installs. The packager is
-dependency-free (`node:zlib` plus a minimal zip writer) and takes an optional
-`--out-dir`:
+Writes two artifacts into `dist/skills/`, both from the same source tree, so
+they cannot disagree:
+
+| Artifact                | What it is                                                                                     | Where it goes                                                     |
+| ----------------------- | ---------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| `netbox-modeling.skill` | A zip of `skills/netbox-modeling/`, entries prefixed with the skill's own directory name       | A client that installs a skill folder                             |
+| `netbox-modeling.md`    | Every markdown file flattened into one document, cross-references rewritten to in-page anchors | A surface that takes a single knowledge file rather than a folder |
+
+The build prints the byte size of each, so a release can see at a glance whether
+one of them ballooned. The packager is dependency-free (`node:zlib` plus a
+minimal zip writer) and takes an optional `--out-dir`:
 
 ```sh
 node scripts/build-skill.mjs --out-dir /tmp
 ```
+
+Neither artifact is needed on the Claude surface: the plugin at
+`.claude-plugin/` bundles this directory directly. See
+[`docs/installing-the-skill.md`](../docs/installing-the-skill.md) for the
+per-surface install.
 
 ## Maintaining a skill here
 

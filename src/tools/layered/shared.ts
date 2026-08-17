@@ -370,5 +370,10 @@ export function describePayload(
     filters: result.filters ?? [],
     filter_grammar: result.filterGrammar ?? null,
     notes: result.notes,
+    // Mirrors the prose note that `notes` already carries as its first entry.
+    // Callers that render Markdown see the note; callers that read
+    // `structuredContent` get the same facts as data, with the removal version
+    // and its certainty separated from the sentence describing them.
+    deprecations: result.deprecations ?? [],
   };
 }

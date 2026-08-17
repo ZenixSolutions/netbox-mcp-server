@@ -1,0 +1,26 @@
+{
+  "name": "zenix-solutions",
+  "owner": {
+    "name": "Zenix Solutions",
+    "url": "https://github.com/ZenixSolutions"
+  },
+  "description": "MCP servers and agent skills published by Zenix Solutions.",
+  "plugins": [
+    {
+      "name": "netbox-mcp",
+      "source": "./",
+      "displayName": "NetBox",
+      "description": "NetBox source of truth for your assistant: the five-tool netbox MCP server plus the netbox-modeling skill that drives it.",
+      "author": {
+        "name": "Zenix Solutions",
+        "url": "https://github.com/ZenixSolutions"
+      },
+      "homepage": "https://github.com/ZenixSolutions/netbox-mcp-server#readme",
+      "repository": "https://github.com/ZenixSolutions/netbox-mcp-server",
+      "license": "MIT",
+      "keywords": ["netbox", "dcim", "ipam", "infrastructure", "mcp"],
+      "category": "infrastructure",
+      "skills": ["./skills/netbox-modeling"]
+    }
+  ]
+}

@@ -66,6 +66,53 @@ export interface FilterSpec {
   description?: string | undefined;
 }
 
+/**
+ * One hand-encoded NetBox deprecation or removal.
+ *
+ * The single exception to "everything here is derived at runtime". NetBox
+ * publishes no machine-readable deprecation signal, so this cannot be derived;
+ * see `src/schema/deprecations.ts` for the full justification and the table.
+ *
+ * It is ADVISORY. Nothing built from a `Deprecation` refuses, rewrites or
+ * gates a request — the API token's permissions remain the only authority over
+ * what may be written.
+ */
+export interface Deprecation {
+  /** What is deprecated: an object type key, or `<key>.<field>`. */
+  readonly target: string;
+  /**
+   * The object type the note attaches to; for a field-level entry, the owning
+   * type. Carried separately rather than parsed out of `target`: a plugin key
+   * is `plugins.<plugin>.<model>`, so counting dots cannot tell a field target
+   * from an object-type target.
+   */
+  readonly objectType: ObjectTypeKey;
+  /** NetBox version that deprecated it, e.g. `4.3`. */
+  readonly since: string;
+  /**
+   * Version it is removed in, or targeted for. Omitted when genuinely
+   * unannounced. When it EQUALS `since` the thing was removed outright in that
+   * release with no deprecation period — `dcim.module.local_context_data` went
+   * in a patch release that way — and the note says "removed", not "deprecated".
+   */
+  readonly removedIn?: string | undefined;
+  /** How certain `removedIn` is. NetBox is not always as definite as it sounds. */
+  readonly removalCertainty?:
+    "announced-in-docs" | "issue-only" | "unannounced" | undefined;
+  /** What to do instead, concrete enough to act on without a second lookup. */
+  readonly useInstead: string;
+  /** Citation URL. */
+  readonly source: string;
+  /** True when the API accepts the call, answers 200, and silently does nothing. */
+  readonly silentNoOp?: boolean | undefined;
+  /**
+   * Overrides the generated headline subject when `target` alone would mislead
+   * — e.g. when only the write methods of an endpoint were removed and the
+   * endpoint itself still serves reads.
+   */
+  readonly subject?: string | undefined;
+}
+
 export interface DescribeResult {
   object_type: ObjectTypeKey;
   operation: Operation;
@@ -96,6 +143,16 @@ export interface DescribeResult {
   dependsOn: ObjectTypeKey[];
   /** Anything the caller must know that the field list cannot express. */
   notes: string[];
+  /**
+   * NetBox deprecations that apply to this type and operation, if any.
+   *
+   * A machine-readable mirror of the deprecation entries in `notes`, which are
+   * always present and always come FIRST — a caller that reads only the prose
+   * loses nothing. Absent, not empty, when nothing applies.
+   *
+   * Advisory. Populating this never changes what a write is allowed to do.
+   */
+  deprecations?: Deprecation[] | undefined;
 }
 
 export interface ListObjectTypesFilter {

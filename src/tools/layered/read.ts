@@ -78,6 +78,8 @@ const FilterValue = z.union([
   z.array(z.union([z.string(), z.number(), z.boolean()])),
 ]);
 
+type FilterInput = z.infer<typeof FilterValue>;
+
 const Input = {
   object_type: z
     .string()
@@ -267,6 +269,42 @@ function unknownFilterMessage(
   );
 }
 
+/**
+ * NetBox turns brief mode on for ANY non-empty value of `brief`. The check is
+ * `request.GET.get('brief')` — a bare truthiness test on the raw string — so
+ * `brief=false` and `brief=0` both ENABLE it, because `'false'` and `'0'` are
+ * truthy Python strings. Absence is the only way to turn it off.
+ *
+ * That inverts the obvious call. A model asking for full objects writes
+ * `{ brief: false }` and receives the compact form, which is a well-formed
+ * object with most of its fields missing — it does not look like an error, and
+ * a caller that then reports a field as absent from NetBox would be wrong.
+ * Same failure shape as the misspelled filter that returned the whole
+ * collection: the request succeeds and the answer is not what was asked for.
+ *
+ * So `brief` is translated rather than forwarded — falsey values drop the
+ * parameter, truthy ones send the canonical `true`. Both directions are what
+ * the caller asked for; nothing else is touched, and real boolean filters like
+ * `enabled=false` keep going through verbatim.
+ *
+ * Source-level reading of `netbox/netbox/api/viewsets/__init__.py` on 4.6.8,
+ * not documented behaviour: it could change without a release note.
+ */
+export function normaliseBrief(
+  filters: Record<string, FilterInput>,
+): Record<string, FilterInput> {
+  if (!("brief" in filters)) return filters;
+  const { brief, ...rest } = filters;
+  const off =
+    brief === undefined ||
+    brief === false ||
+    brief === 0 ||
+    brief === "" ||
+    brief === "false" ||
+    brief === "0";
+  return off ? rest : { ...rest, brief: true };
+}
+
 async function runList(
   summary: ObjectTypeSummary,
   args: ReadArgs,
@@ -294,7 +332,7 @@ async function runList(
   let response: PaginatedResponse<Record<string, unknown>>;
   try {
     response = await getClient().list<Record<string, unknown>>(summary.endpoint, {
-      ...filters,
+      ...normaliseBrief(filters),
       limit: args.limit,
       offset: args.offset,
     });
