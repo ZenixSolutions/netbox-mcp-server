@@ -99,3 +99,57 @@ describe(".github/workflows/release.yml auth paths", () => {
     }
   });
 });
+
+/**
+ * The skill is NOT in the npm tarball.
+ *
+ * `files` points at `dist`, and the publish job's build step is `tsc`, so
+ * `dist/skills/` does not exist when `npm pack` runs. That is fine — the skill
+ * is not a Node module — but it means the GitHub release is the ONLY place a
+ * user on ChatGPT desktop or Grok Build can get the skill as a file.
+ *
+ * `docs/installing-the-skill.md` said so before it was true. v0.2.0 published
+ * to npm and produced no GitHub release at all, only a tag: `release.yml`
+ * never ran `build:skill`, never created a release, never uploaded an asset.
+ * Nothing failed, because nothing was watching.
+ */
+describe(".github/workflows/release.yml ships the skill", () => {
+  const yaml = readFileSync(".github/workflows/release.yml", "utf8");
+
+  it("packages the skill during a release", () => {
+    expect(yaml).toContain("npm run build:skill");
+  });
+
+  it("attaches both artifacts to the release", () => {
+    // The archive is for Claude; the flattened Markdown is for the surfaces
+    // that take an uploaded document instead of a skill directory. Shipping
+    // one without the other silently strands half the install matrix.
+    expect(yaml).toContain("dist/skills/netbox-modeling.skill");
+    expect(yaml).toContain("dist/skills/netbox-modeling.md");
+    expect(yaml).toContain("gh release create");
+  });
+
+  it("creates the release only after the publish succeeded", () => {
+    // Otherwise a failed publish leaves a release announcing a version that is
+    // not on the registry — worse than no release, because it looks fine.
+    expect(yaml).toMatch(/github-release:[\s\S]*?needs:\s*publish/);
+  });
+
+  it("keeps contents:write off the job that holds the npm credential", () => {
+    // Least privilege, and it is cheap to state: the release job needs write to
+    // create a release; the publish job must not have it.
+    const publishBlock = yaml.slice(
+      yaml.indexOf("  publish:"),
+      yaml.indexOf("  github-release:"),
+    );
+    const releaseBlock = yaml.slice(yaml.indexOf("  github-release:"));
+    expect(publishBlock).not.toContain("contents: write");
+    expect(releaseBlock).toContain("contents: write");
+  });
+
+  it("refuses to upload an artifact that built empty", () => {
+    // A zip writer that produced a 0-byte archive would otherwise be published
+    // as a release asset and found by whoever downloaded it.
+    expect(yaml).toMatch(/is missing or empty|-s "\$f"/);
+  });
+});
