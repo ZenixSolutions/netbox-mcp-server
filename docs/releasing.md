@@ -3,7 +3,7 @@
 `.github/workflows/release.yml` publishes `@zenixsolutions/netbox-mcp` to npm when a
 `v*` tag is pushed.
 
-**Four releases have shipped: 0.1.0, 0.1.1, 0.1.2 and 0.1.3.** The first publish — the
+**Five releases have shipped: 0.1.0, 0.1.1, 0.1.2, 0.1.3 and 0.2.0.** The first publish — the
 part that cannot be automated — is done, and the trusted publisher is configured and
 proven. What follows is the routine path first, then the exact configuration that makes
 it work, then the things the four runs taught. Each of those cost a run, and each had a

@@ -102,7 +102,7 @@ pasting a `mcpServers` JSON block here does nothing.
 | ----------- | ---------------------------------------------------- |
 | Name        | `netbox`                                             |
 | Command     | `npx`                                                |
-| Arguments   | `-y` and `@zenixsolutions/netbox-mcp@0.1.3`          |
+| Arguments   | `-y` and `@zenixsolutions/netbox-mcp@0.2.0`          |
 | Environment | `NETBOX_URL` = your URL, `NETBOX_TOKEN` = your token |
 
 ### Route B — the config file
@@ -118,7 +118,7 @@ Append this. Do not replace the file — it holds your other settings.
 ```toml
 [mcp_servers.netbox]
 command = "npx"
-args = ["-y", "@zenixsolutions/netbox-mcp@0.1.3"]
+args = ["-y", "@zenixsolutions/netbox-mcp@0.2.0"]
 # The first launch downloads the package; the default 10s is not enough for it.
 startup_timeout_sec = 30
 # A large NetBox list can outrun the 60s default.
@@ -218,7 +218,7 @@ Same TOML shape as Codex:
 ```toml
 [mcp_servers.netbox]
 command = "npx"
-args = ["-y", "@zenixsolutions/netbox-mcp@0.1.3"]
+args = ["-y", "@zenixsolutions/netbox-mcp@0.2.0"]
 startup_timeout_sec = 30
 tool_timeout_sec = 120
 

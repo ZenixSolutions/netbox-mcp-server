@@ -76,7 +76,7 @@ unset NETBOX_TOKEN
 Do not put the token in `~/.zshrc` or any other shell profile. It belongs in the client
 config and nowhere else.
 
-Pin the version — `"@zenixsolutions/netbox-mcp@0.1.3"` — if you do not want the tool
+Pin the version — `"@zenixsolutions/netbox-mcp@0.2.0"` — if you do not want the tool
 surface to change between restarts. This project is below `1.0.0`, and the
 [CHANGELOG](CHANGELOG.md) is where surface changes are recorded. Other clients:
 [`AGENTS.md`](AGENTS.md).
@@ -204,7 +204,7 @@ install. Substitute `node dist/index.js` for `netbox-mcp` if you built from a cl
 | Command                   | Does                                                                                         | Exit code                       |
 | ------------------------- | -------------------------------------------------------------------------------------------- | ------------------------------- |
 | `netbox-mcp --help`       | Prints usage and every environment variable. Reads no configuration.                         | 0                               |
-| `netbox-mcp --version`    | Prints the version, e.g. `0.1.3`.                                                            | 0                               |
+| `netbox-mcp --version`    | Prints the version, e.g. `0.2.0`.                                                            | 0                               |
 | `netbox-mcp --check`      | Validates configuration and names the first missing or invalid variable.                     | **0** usable, **78** not usable |
 | `netbox-mcp --list-tools` | Prints each tool name to stdout and `N tools registered.` to stderr. Needs no NetBox at all. | 0                               |
 
@@ -215,7 +215,7 @@ wrong, or absent — it can never surface a config error.
 ```bash
 # Is the configuration usable? Names the offending variable and exits 78 if not.
 NETBOX_URL=https://netbox.corp.com NETBOX_TOKEN="$NETBOX_TOKEN" netbox-mcp --check
-# -> ok: netbox-mcp-server v0.1.3 configured for https://netbox.corp.com
+# -> ok: netbox-mcp-server v0.2.0 configured for https://netbox.corp.com
 
 # Does the binary work at all? Needs no credentials and makes no network calls.
 netbox-mcp --list-tools

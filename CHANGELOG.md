@@ -10,6 +10,10 @@ surface may change in a minor release, with the change noted here.
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.2.0] - 2026-08-17
+
 ### Added
 
 - **NetBox deprecation warnings, surfaced through `netbox_describe`**
@@ -414,7 +418,8 @@ tool surface.
   registration lives in the `REGISTRARS` table in `src/server.ts`. The 15 tool
   counts were verified against the built binary and are correct as published.
 
-[Unreleased]: https://github.com/ZenixSolutions/netbox-mcp-server/compare/v0.1.3...HEAD
+[Unreleased]: https://github.com/ZenixSolutions/netbox-mcp-server/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/ZenixSolutions/netbox-mcp-server/releases/tag/v0.2.0
 [0.1.3]: https://github.com/ZenixSolutions/netbox-mcp-server/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/ZenixSolutions/netbox-mcp-server/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/ZenixSolutions/netbox-mcp-server/compare/v0.1.0...v0.1.1
