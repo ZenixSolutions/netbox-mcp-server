@@ -95,6 +95,20 @@ surface may change in a minor release, with the change noted here.
 
 ### Fixed
 
+- **A removal note asserted behaviour the connected instance refuted.** It read
+  "It worked on earlier releases, so an instance older than 4.6.3 still accepts
+  it" for `dcim.module.local_context_data` — and a contract run against a live
+  NetBox **4.6.0** found the field absent from that instance's own derived write
+  schema. NetBox's release note calls it "unused", so it was very likely never
+  writable through the API at all. The table knew a version number and inferred
+  behaviour from it.
+
+  A removal is now read against the instance rather than asserted from the
+  table: absent explains why the field is missing, present says the instance
+  predates the release so the field works now and breaks on upgrade, and with no
+  field list to check the note states the removal and stops. Same discipline as
+  the rest of this layer — the connected instance is the evidence.
+
 - **`netbox_read` could send `brief=false`, which turns brief mode ON.** NetBox
   tests the raw query string for truthiness — `request.GET.get('brief')` — and
   `'false'` and `'0'` are truthy Python strings, so absence is the only "off".

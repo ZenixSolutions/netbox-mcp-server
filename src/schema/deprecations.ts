@@ -285,12 +285,26 @@ function subjectOf(deprecation: Deprecation): string {
  * items are "removed in 5.0" would be repeating something NetBox has never
  * published — only its tracking issue says it.
  */
-function timingOf(deprecation: Deprecation): string {
+function timingOf(deprecation: Deprecation, presence?: FieldPresence): string {
   if (wasRemoved(deprecation)) {
-    return (
-      `NetBox REMOVED this in ${String(deprecation.removedIn)}. It worked on earlier ` +
-      `releases, so an instance older than ${String(deprecation.removedIn)} still accepts it.`
-    );
+    const head = `NetBox REMOVED this in ${String(deprecation.removedIn)}.`;
+    // Do NOT assert what an older instance does. A live run against 4.6.0
+    // refuted exactly that claim: this note said `local_context_data` "worked
+    // on earlier releases, so an instance older than 4.6.3 still accepts it",
+    // and the field was absent from that instance's derived write schema —
+    // NetBox's own note calls it "unused", so it was very likely never
+    // writable through the API at all. The connected instance is the only
+    // evidence available here, so say what it shows and nothing more.
+    if (presence === "absent") {
+      return `${head} That is why it is not in the fields above: this instance does not accept it.`;
+    }
+    if (presence === "present") {
+      return (
+        `${head} This instance still exposes it, so it predates that release — ` +
+        `writing it works now and stops working on upgrade.`
+      );
+    }
+    return head;
   }
   // "Still functional" would be a lie about a silent no-op: the field is still
   // SERVED, it just cannot be written any more.
@@ -321,10 +335,21 @@ function timingOf(deprecation: Deprecation): string {
  * Deliberately blunt at the front: this is the string that has to survive a
  * model skimming a long describe result.
  */
-export function deprecationNote(deprecation: Deprecation): string {
+/**
+ * Whether the connected instance's derived schema actually carries the field
+ * this entry names. `unknown` covers the cases where there is nothing to check
+ * against — an object-type-level entry, or a `list`/`get` description, neither
+ * of which has a write field list.
+ */
+export type FieldPresence = "present" | "absent" | "unknown";
+
+export function deprecationNote(
+  deprecation: Deprecation,
+  presence: FieldPresence = "unknown",
+): string {
   const parts: string[] = [
     `${wasRemoved(deprecation) ? "REMOVED" : "DEPRECATED"}: ${subjectOf(deprecation)}.`,
-    timingOf(deprecation),
+    timingOf(deprecation, presence),
   ];
   if (deprecation.silentNoOp === true) {
     parts.push(
