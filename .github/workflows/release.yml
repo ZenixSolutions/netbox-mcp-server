@@ -13,6 +13,10 @@ on:
 # `id-token: write` is required for both npm provenance (token path) and the
 # OIDC exchange (trusted-publishing path). Without it npm silently falls back
 # and the failure is reported as a 404.
+#
+# `contents` stays READ here. Creating a GitHub release needs write, and that
+# is granted at the job level on `github-release` alone — the job that holds an
+# npm credential has no business being able to write to the repository.
 permissions:
   contents: read
   id-token: write
@@ -250,3 +254,94 @@ jobs:
           EOF
           fi
           echo "::endgroup::"
+
+  # ---------------------------------------------------------------------------
+  # The GitHub release, and the skill artifacts that only exist here.
+  #
+  # This job is why it exists: the skill is NOT in the npm tarball. `files`
+  # points at `dist`, and the publish job's build step is `tsc`, so
+  # `dist/skills/` does not exist when `npm pack` runs. Users on ChatGPT desktop
+  # and Grok Build need the skill as a file, and before this job the only way to
+  # get one was to clone the repo and build it — while the docs claimed it was
+  # attached to the release. It was not; v0.2.0 shipped with no GitHub release
+  # at all, only a tag.
+  #
+  # Separate job, not extra steps on `publish`, for two reasons: `contents:
+  # write` stays off the job that holds an npm credential, and `needs: publish`
+  # means a failed publish cannot leave behind a release announcing a version
+  # that is not on the registry.
+  # ---------------------------------------------------------------------------
+  github-release:
+    name: github release
+    needs: publish
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+
+      # `build:skill` reads `skills/` and writes `dist/skills/`. It does not
+      # need `tsc` to have run, but it does need devDependencies for nothing at
+      # all — it is dependency-free by design (node:zlib plus a minimal zip
+      # writer). `npm ci` is here so the script's own `node:` imports resolve
+      # against the pinned Node, not to install anything it uses.
+      - name: Install
+        run: npm ci
+        env:
+          NODE_ENV: development
+
+      - name: Package the skill
+        run: npm run build:skill
+
+      # Both artifacts must exist and be non-trivial. A zip writer that silently
+      # produced an empty archive would otherwise be published as a release
+      # asset and only discovered by whoever downloaded it.
+      - name: Verify the artifacts
+        run: |
+          for f in dist/skills/netbox-modeling.skill dist/skills/netbox-modeling.md; do
+            if [ ! -s "$f" ]; then
+              echo "::error::$f is missing or empty"
+              exit 1
+            fi
+            size=$(wc -c < "$f")
+            if [ "$size" -lt 10000 ]; then
+              echo "::error::$f is only ${size} bytes — the skill is ~95 KB of Markdown, so this is a broken build, not a small skill"
+              exit 1
+            fi
+            echo "$f: ${size} bytes"
+          done
+          unzip -l dist/skills/netbox-modeling.skill | tail -3
+
+      # The release notes are the changelog section, not generated commit
+      # titles: the section is the thing a human wrote and the thing
+      # `check-changelog.mjs` already gated on in the publish job.
+      - name: Extract the changelog section
+        run: |
+          tag_version="${GITHUB_REF_NAME#v}"
+          awk -v v="$tag_version" '
+            $0 ~ "^## \\[" v "\\]" { found = 1; next }
+            found && /^## \[/ { exit }
+            found { print }
+          ' CHANGELOG.md > /tmp/release-notes.md
+          if [ ! -s /tmp/release-notes.md ]; then
+            echo "::error::No changelog section found for ${tag_version}. The publish job's changelog check passed, so this is an extraction bug in this step, not a missing section."
+            exit 1
+          fi
+          echo "Release notes: $(wc -l < /tmp/release-notes.md) line(s)."
+
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "$GITHUB_REF_NAME" \
+            --notes-file /tmp/release-notes.md \
+            dist/skills/netbox-modeling.skill \
+            dist/skills/netbox-modeling.md

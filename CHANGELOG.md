@@ -10,7 +10,27 @@ surface may change in a minor release, with the change noted here.
 
 ## [Unreleased]
 
-Nothing yet.
+### Fixed
+
+- **The release workflow never shipped the skill.** `docs/installing-the-skill.md`
+  said the artifacts were attached to each GitHub release. They were not:
+  `release.yml` published to npm and stopped — it never ran `build:skill`, never
+  created a release, never uploaded an asset. **v0.2.0 produced no GitHub
+  release at all, only a tag.** Nothing failed, because nothing was watching.
+
+  This matters because the skill is not in the npm tarball either, and cannot
+  be: `files` points at `dist`, and the publish job's build step is `tsc`, so
+  `dist/skills/` does not exist when `npm pack` runs. The GitHub release is the
+  only place a user on ChatGPT desktop or Grok Build can get the skill as a
+  file. Until now the only route was to clone the repo and build it.
+
+  A `github-release` job now packages both artifacts, verifies neither built
+  empty, takes its notes from the changelog section the publish job already
+  gated on, and uploads them. It is a separate job so that `contents: write`
+  stays off the job holding an npm credential, and `needs: publish` so a failed
+  publish cannot leave behind a release announcing a version that is not on the
+  registry. Five assertions in `tests/unit/workflow-step-order.test.ts` pin all
+  of that.
 
 ## [0.2.0] - 2026-08-17
 
