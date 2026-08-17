@@ -74,6 +74,25 @@ surface may change in a minor release, with the change noted here.
   to stored skills or instructions, so a weekly _alarm_ is possible and a weekly
   _refresh_ is not.
 
+- `tests/unit/tool-schema-contract.test.ts`, which asserts what `tools/list`
+  actually publishes rather than what the Zod shapes say. The input schema is
+  the contract, and this repository does not generate it — the SDK converts our
+  Zod shapes and **Zod decides what the JSON Schema says**, so the contract can
+  change without a line here changing.
+
+  It already has. Bumping Zod 3.25.76 → 4.4.3 (#40) drops
+  `additionalProperties: false` from **all five** tool schemas: 7 occurrences
+  become 2. Every test passed and all six CI checks were green. Zod still strips
+  unknown keys at runtime, so it is not an injection path — but a host that
+  validates a call against the advertised schema before dispatching would begin
+  accepting arguments the previous schema refused, and nothing would report it.
+
+  The test also pins the properties that are meant to be structural: that
+  neither execution tool exposes a `path`, `url`, `endpoint` or `uri` argument,
+  and that the read/write annotation split is accurate rather than conservative
+  — ChatGPT desktop's `writes` approval mode gates on exactly those hints.
+  Confirmed to fail under 4.4.3 and pass under 3.25.76.
+
 ### Fixed
 
 - **`netbox_read` could send `brief=false`, which turns brief mode ON.** NetBox
