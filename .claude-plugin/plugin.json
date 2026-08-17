@@ -1,7 +1,7 @@
 {
   "name": "netbox-mcp",
   "displayName": "NetBox",
-  "version": "0.1.3",
+  "version": "0.2.0",
   "description": "NetBox source of truth for your assistant: the five-tool netbox MCP server plus the netbox-modeling skill that drives it. Model sites, racks, devices, modules, cables and IPAM without guessing a field name.",
   "author": {
     "name": "Zenix Solutions",
@@ -29,7 +29,7 @@
   "mcpServers": {
     "netbox": {
       "command": "npx",
-      "args": ["-y", "@zenixsolutions/netbox-mcp@0.1.3"],
+      "args": ["-y", "@zenixsolutions/netbox-mcp@0.2.0"],
       "env": {
         "NETBOX_URL": "${user_config.netbox_url}",
         "NETBOX_TOKEN": "${user_config.netbox_token}"

@@ -8,7 +8,7 @@ If you are a human reading this, use [`README.md`](README.md) instead — it say
 things in fewer words.
 
 **Every command output quoted in this file was captured by running that command against
-version `0.1.3`.** Where a step needs a live NetBox instance and therefore could not be
+version `0.2.0`.** Where a step needs a live NetBox instance and therefore could not be
 run, the file says so explicitly instead of asserting an output. Do not treat a
 "cannot be verified here" note as permission to guess at the result — report what you
 actually see.
@@ -43,7 +43,7 @@ Facts you may need:
 
 | Property           | Value                                                       |
 | ------------------ | ----------------------------------------------------------- |
-| Version documented | `0.1.3`                                                     |
+| Version documented | `0.2.0`                                                     |
 | Language / runtime | TypeScript compiled to ESM JavaScript, Node.js **>= 20.11** |
 | npm package        | `@zenixsolutions/netbox-mcp`, binary name `netbox-mcp`      |
 | Normal install     | `npx -y @zenixsolutions/netbox-mcp` — no clone, no build    |
@@ -276,7 +276,7 @@ npx -y @zenixsolutions/netbox-mcp --version
 - **Expected:** the version on stdout and exit 0. Verified: this prints
 
   ```
-  0.1.3
+  0.2.0
   ```
 
   You are done with this section — go to section 5.
@@ -296,7 +296,7 @@ command -v npx   # e.g. /opt/homebrew/bin/npx
 
 **Note the version-floating trade-off, and tell the user.** Unpinned, `npx` resolves the
 newest release whenever its cache misses, so behaviour can change between client
-restarts. Pin it in the config — `"@zenixsolutions/netbox-mcp@0.1.3"` — if the user wants
+restarts. Pin it in the config — `"@zenixsolutions/netbox-mcp@0.2.0"` — if the user wants
 a fixed version. Use whatever `--version` just printed, not the literal string above.
 
 ### 4B. From a clone (contributors, blocked registry)
@@ -330,7 +330,7 @@ npm run build
   banner lines and nothing else** — verified:
 
   ```
-  > @zenixsolutions/netbox-mcp@0.1.3 build
+  > @zenixsolutions/netbox-mcp@0.2.0 build
   > tsc
   ```
 
@@ -351,7 +351,7 @@ both in section 6:
 
 ```bash
 test -f dist/index.js && echo "BUILD OK"
-node dist/index.js --version    # verified: prints 0.1.3
+node dist/index.js --version    # verified: prints 0.2.0
 pwd                             # e.g. /Users/alice/mcp-servers/netbox-mcp-server
 command -v node                 # e.g. /opt/homebrew/bin/node
 ```
@@ -376,7 +376,7 @@ Write `npx -y @zenixsolutions/netbox-mcp` where the table says `netbox-mcp`, or
 | Command                   | Does                                                                                      | Exit code                       |
 | ------------------------- | ----------------------------------------------------------------------------------------- | ------------------------------- |
 | `netbox-mcp --help`       | Prints usage and every environment variable the server reads. Reads no configuration.     | 0                               |
-| `netbox-mcp --version`    | Prints the version. Verified: `0.1.3`.                                                    | 0                               |
+| `netbox-mcp --version`    | Prints the version. Verified: `0.2.0`.                                                    | 0                               |
 | `netbox-mcp --check`      | Validates configuration; names the first missing or invalid variable. Contacts nothing.   | **0** usable, **78** not usable |
 | `netbox-mcp --list-tools` | Prints the 5 tool names to stdout, `5 tools registered.` to stderr. Needs no credentials. | 0                               |
 
@@ -388,7 +388,7 @@ Any other argument, or no argument at all, starts the server on stdio. There is 
 Verified output, in full:
 
 ```
-netbox-mcp-server v0.1.3
+netbox-mcp-server v0.2.0
 
 MCP server exposing the NetBox REST API to an AI assistant.
 
@@ -439,7 +439,7 @@ All four outcomes below were produced by running the command:
   `NETBOX_TOKEN=x`, it printed on stdout:
 
   ```
-  ok: netbox-mcp-server v0.1.3 configured for https://x.invalid
+  ok: netbox-mcp-server v0.2.0 configured for https://x.invalid
   ```
 
   Note that `https://x.invalid` does not resolve and the token is nonsense, and `--check`
@@ -496,13 +496,13 @@ on stdout, plus `5 tools registered.` on stderr, exit 0.
 **The count is always 5.** It does not vary with the environment, the NetBox version, or
 the plugins installed — the five tools are registered statically, and the instance schema
 is only consulted when a tool is _called_. If you ever see a number other than 5, you are
-not running `0.1.3`.
+not running `0.2.0`.
 
 ### 5.4 Running the server directly
 
 Starting it with no arguments and no configuration exits **78** with the same
 `Missing required environment variable NETBOX_URL` message. With configuration present it
-prints `netbox-mcp-server v0.1.3 running on stdio` to stderr and then waits for JSON-RPC
+prints `netbox-mcp-server v0.2.0 running on stdio` to stderr and then waits for JSON-RPC
 on stdin — both verified. Do not leave a bare server running in your shell; it is the
 client's job to launch it.
 
@@ -600,7 +600,7 @@ Create it if it does not exist. Add **only** this one entry inside the existing
 }
 ```
 
-To pin the version, use `"@zenixsolutions/netbox-mcp@0.1.3"` as the second argument,
+To pin the version, use `"@zenixsolutions/netbox-mcp@0.2.0"` as the second argument,
 substituting the version `--version` printed in section 4A.
 
 **Clone path (section 4B):**
@@ -734,7 +734,7 @@ NETBOX_URL="$NETBOX_URL" NETBOX_TOKEN="$NETBOX_TOKEN" \
   npx -y @zenixsolutions/netbox-mcp --check; echo "exit=$?"
 ```
 
-Expect `ok: netbox-mcp-server v0.1.3 configured for <their URL>` and `exit=0`. Exit 78
+Expect `ok: netbox-mcp-server v0.2.0 configured for <their URL>` and `exit=0`. Exit 78
 means the configuration is unusable and the message names the variable — see section 5.2
 for all four outcomes.
 

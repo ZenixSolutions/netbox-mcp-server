@@ -1,6 +1,6 @@
 {
   "name": "@zenixsolutions/netbox-mcp",
-  "version": "0.1.3",
+  "version": "0.2.0",
   "description": "Model Context Protocol server for the NetBox REST API",
   "license": "MIT",
   "repository": {
