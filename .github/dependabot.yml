@@ -5,26 +5,50 @@ version: 2
 # which reads as a broken upgrade rather than an incomplete one. Same for the
 # eslint/typescript-eslint family. `update-types` is deliberately unset so
 # majors move as a set too.
+#
+# `typescript` belongs in that same group, and used not to be. It had its own
+# group with @types/node, so TypeScript could move without the tooling that
+# constrains it — which is exactly what happened in #38: TypeScript 5.9.3 ->
+# 7.0.2 against `typescript-eslint@8.66.0`, whose peer range is
+# `>=4.8.4 <6.1.0`. All five build jobs died in `Install`, before a test ran.
+# That PR was not bad luck; it was this file, and it would have been reopened
+# every week until the grouping matched the peer constraint.
 updates:
   - package-ecosystem: npm
     directory: /
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+
+    ignore:
+      # zod 4 is supported by @modelcontextprotocol/sdk (`^3.25 || ^4.0`) and
+      # passes the whole suite, but it changes what `tools/list` PUBLISHES:
+      # `additionalProperties: false` disappears from all five tool schemas,
+      # so the contract stops declaring that unknown arguments are rejected.
+      # We generate none of that — the SDK converts our Zod shapes and Zod
+      # decides the JSON Schema — so this is not fixable here, and there is no
+      # zod 4 feature we want. `tests/unit/tool-schema-contract.test.ts` holds
+      # the acceptance criteria; when the SDK emits the stricter schema under
+      # zod 4, delete this entry and the test will confirm it. See #40.
+      - dependency-name: "zod"
+        update-types: ["version-update:semver-major"]
+
     groups:
       vitest:
         patterns:
           - "vitest"
           - "@vitest/*"
+      # typescript is here, not in a group of its own: typescript-eslint's peer
+      # range is what decides which TypeScript versions can install at all.
       eslint:
         patterns:
           - "eslint"
           - "@eslint/*"
           - "typescript-eslint"
           - "eslint-config-*"
-      typescript:
-        patterns:
           - "typescript"
+      types:
+        patterns:
           - "@types/node"
 
   - package-ecosystem: github-actions
