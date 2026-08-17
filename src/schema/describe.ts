@@ -16,13 +16,14 @@
  */
 
 import type {
+  Deprecation,
   DescribeResult,
   FieldSpec,
   FilterSpec,
   ObjectTypeKey,
   Operation,
 } from "./types.js";
-import { deprecationNote, deprecationsFor } from "./deprecations.js";
+import { deprecationNote, deprecationsFor, type FieldPresence } from "./deprecations.js";
 import {
   deref,
   getComponent,
@@ -373,10 +374,26 @@ function readOnlyNote(names: string[]): string | undefined {
 function withDeprecations(result: DescribeResult): DescribeResult {
   const deprecations = deprecationsFor(result.object_type, result.operation);
   if (deprecations.length === 0) return result;
+
+  // A removal note is checked against THIS instance rather than asserted from
+  // the table. `dcim.module.local_context_data` is why: the table says NetBox
+  // removed it in 4.6.3, and a live 4.6.0 — which the table's own wording
+  // claimed would still accept it — does not carry the field at all.
+  const declared = new Set(result.fields.map((field) => field.name));
+  const presenceOf = (deprecation: Deprecation): FieldPresence => {
+    if (deprecation.target === deprecation.objectType) return "unknown";
+    if (result.fields.length === 0) return "unknown";
+    const field = deprecation.target.slice(deprecation.objectType.length + 1);
+    return declared.has(field) ? "present" : "absent";
+  };
+
   return {
     ...result,
     deprecations,
-    notes: [...deprecations.map(deprecationNote), ...result.notes],
+    notes: [
+      ...deprecations.map((d) => deprecationNote(d, presenceOf(d))),
+      ...result.notes,
+    ],
   };
 }
 

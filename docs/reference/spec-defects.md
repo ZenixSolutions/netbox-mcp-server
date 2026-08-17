@@ -13,7 +13,7 @@ the NetBox instance.
 
 |                     |                              |
 | ------------------- | ---------------------------- |
-| Generated           | 2026-08-05T20:32:13.299Z |
+| Generated           | 2026-08-17T21:52:08.234Z |
 | Instance            | https://<redacted> (set NETBOX_CONTRACT_INCLUDE_HOST=1 to record the host) |
 | NetBox, /api/status/ | 4.6.0 |
 | NetBox, schema info.version | 4.6.0 (4.6) |
@@ -48,15 +48,15 @@ Everything the suite looked at, including the checks that passed.
 
 | | Check | Derived | Actual |
 | --- | ----- | ------- | ------ |
-| INFO | schema Content-Type | application/vnd.oai.openapi+json (§1.2 — the loader must NOT gate on application/json) | application/vnd.oai.openapi+json (from cache) |
+| INFO | schema Content-Type | application/vnd.oai.openapi+json (§1.2 — the loader must NOT gate on application/json) | application/vnd.oai.openapi+json |
 | INFO | schema Content-Encoding | gzip; §1.2 calls compression 'not optional at this size' | none — the body was transferred uncompressed |
-| INFO | schema document size | 6-13 MB from a live instance; 12.9 MB pretty-printed upstream (§1.3) | 12431579 bytes (12.43 MB), recorded at fetch time |
+| INFO | schema document size | 6-13 MB from a live instance; 12.9 MB pretty-printed upstream (§1.3) | 12431579 bytes (12.43 MB) |
 | INFO | schema info.version | a NetBox version string, e.g. 4.6.7 | 4.6.0 (4.6) |
 | INFO | schema component count | 1043 component schemas on stock 4.6.7 | 864 components, openapi 3.0.3 |
 | INFO | /api/status/ netbox-version | a version string; netbox-docker #1582 says it can be null (§1.4) | 4.6.0 |
 | INFO | /api/status/ version agrees with schema info.version | the same version; the provider prefers /api/status/ when both are present | status=4.6.0, info.version=4.6.0 (4.6) |
 | INFO | /api/status/ other fields | django-version, python-version, plugins, rq-workers-running (§1.4) | {"django-version":"6.0.4","hostname":"netbox","installed_apps":{"django_filters":"25.2","django_prometheus":"2.4.0","django_rq":"4.1.0","django_tables2":"2.8.0","drf_spectacular":"0.29.0","drf_spectacular_sidecar":"2026.5.1","mptt":"0.18.0… |
-| OK | GET /api/schema/?format=json is reachable | HTTP 200 carrying an OpenAPI document; the loader has no bundled fallback | HTTP 200 (replayed from this run's on-disk cache) |
+| OK | GET /api/schema/?format=json is reachable | HTTP 200 carrying an OpenAPI document; the loader has no bundled fallback | HTTP 200 OK in 7599 ms |
 | OK | schema response has an OpenAPI `paths` object | `isOpenApiDocument` requires a non-null `paths` object | paths is object with 338 entries |
 | OK | GET /api/status/ is reachable with this token | HTTP 200; the loader uses it for the cache key and the reported version | HTTP 200 OK |
 
@@ -72,144 +72,144 @@ Everything the suite looked at, including the checks that passed.
 | OK | every object type has a resolvable write schema | exactly one exception on stock NetBox: extras.script (§6 risk 10) | none missing |
 | OK | object types with no resolvable read schema | 0 on stock NetBox | none |
 | OK | object types with no resolvable patch schema | 0 on stock NetBox | none |
-| OK | GET /api/circuits/circuit-group-assignments/ (circuits.circuitgroupassignment) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 69 ms |
-| OK | GET /api/circuits/circuit-groups/ (circuits.circuitgroup) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 118 ms |
-| OK | GET /api/circuits/circuit-terminations/ (circuits.circuittermination) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 133 ms |
-| OK | GET /api/circuits/circuit-types/ (circuits.circuittype) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 122 ms |
-| OK | GET /api/circuits/circuits/ (circuits.circuit) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 147 ms |
-| OK | GET /api/circuits/provider-accounts/ (circuits.provideraccount) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 78 ms |
-| OK | GET /api/circuits/provider-networks/ (circuits.providernetwork) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 80 ms |
-| OK | GET /api/circuits/providers/ (circuits.provider) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 107 ms |
-| OK | GET /api/circuits/virtual-circuit-terminations/ (circuits.virtualcircuittermination) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 85 ms |
-| OK | GET /api/circuits/virtual-circuit-types/ (circuits.virtualcircuittype) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 83 ms |
-| OK | GET /api/circuits/virtual-circuits/ (circuits.virtualcircuit) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 88 ms |
-| OK | GET /api/core/data-sources/ (core.datasource) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 79 ms |
-| OK | GET /api/dcim/cable-bundles/ (dcim.cablebundle) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 77 ms |
-| OK | GET /api/dcim/cables/ (dcim.cable) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 139 ms |
-| OK | GET /api/dcim/console-port-templates/ (dcim.consoleporttemplate) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 78 ms |
-| OK | GET /api/dcim/console-ports/ (dcim.consoleport) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 158 ms |
-| OK | GET /api/dcim/console-server-port-templates/ (dcim.consoleserverporttemplate) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 71 ms |
-| OK | GET /api/dcim/console-server-ports/ (dcim.consoleserverport) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 122 ms |
-| OK | GET /api/dcim/device-bay-templates/ (dcim.devicebaytemplate) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 93 ms |
-| OK | GET /api/dcim/device-bays/ (dcim.devicebay) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 116 ms |
-| OK | GET /api/dcim/device-roles/ (dcim.devicerole) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 89 ms |
-| OK | GET /api/dcim/device-types/ (dcim.devicetype) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 118 ms |
-| OK | GET /api/dcim/devices/ (dcim.device) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 271 ms |
-| OK | GET /api/dcim/front-port-templates/ (dcim.frontporttemplate) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 70 ms |
-| OK | GET /api/dcim/front-ports/ (dcim.frontport) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 155 ms |
-| OK | GET /api/dcim/interface-templates/ (dcim.interfacetemplate) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 105 ms |
-| OK | GET /api/dcim/interfaces/ (dcim.interface) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 207 ms |
-| OK | GET /api/dcim/inventory-item-roles/ (dcim.inventoryitemrole) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 82 ms |
-| OK | GET /api/dcim/inventory-item-templates/ (dcim.inventoryitemtemplate) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 107 ms |
-| OK | GET /api/dcim/inventory-items/ (dcim.inventoryitem) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 171 ms |
-| OK | GET /api/dcim/locations/ (dcim.location) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 110 ms |
-| OK | GET /api/dcim/mac-addresses/ (dcim.macaddress) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 112 ms |
-| OK | GET /api/dcim/manufacturers/ (dcim.manufacturer) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 96 ms |
-| OK | GET /api/dcim/module-bay-templates/ (dcim.modulebaytemplate) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 88 ms |
-| OK | GET /api/dcim/module-bays/ (dcim.modulebay) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 129 ms |
-| OK | GET /api/dcim/module-type-profiles/ (dcim.moduletypeprofile) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 88 ms |
-| OK | GET /api/dcim/module-types/ (dcim.moduletype) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 97 ms |
-| OK | GET /api/dcim/modules/ (dcim.module) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 148 ms |
-| OK | GET /api/dcim/platforms/ (dcim.platform) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 106 ms |
-| OK | GET /api/dcim/power-feeds/ (dcim.powerfeed) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 170 ms |
-| OK | GET /api/dcim/power-outlet-templates/ (dcim.poweroutlettemplate) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 99 ms |
-| OK | GET /api/dcim/power-outlets/ (dcim.poweroutlet) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 138 ms |
-| OK | GET /api/dcim/power-panels/ (dcim.powerpanel) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 138 ms |
-| OK | GET /api/dcim/power-port-templates/ (dcim.powerporttemplate) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 91 ms |
-| OK | GET /api/dcim/power-ports/ (dcim.powerport) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 121 ms |
-| OK | GET /api/dcim/rack-groups/ (dcim.rackgroup) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 88 ms |
-| OK | GET /api/dcim/rack-reservations/ (dcim.rackreservation) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 656 ms |
-| OK | GET /api/dcim/rack-roles/ (dcim.rackrole) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 79 ms |
-| OK | GET /api/dcim/rack-types/ (dcim.racktype) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 98 ms |
+| OK | GET /api/circuits/circuit-group-assignments/ (circuits.circuitgroupassignment) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 83 ms |
+| OK | GET /api/circuits/circuit-groups/ (circuits.circuitgroup) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 93 ms |
+| OK | GET /api/circuits/circuit-terminations/ (circuits.circuittermination) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 153 ms |
+| OK | GET /api/circuits/circuit-types/ (circuits.circuittype) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 112 ms |
+| OK | GET /api/circuits/circuits/ (circuits.circuit) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 146 ms |
+| OK | GET /api/circuits/provider-accounts/ (circuits.provideraccount) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 93 ms |
+| OK | GET /api/circuits/provider-networks/ (circuits.providernetwork) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 83 ms |
+| OK | GET /api/circuits/providers/ (circuits.provider) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 105 ms |
+| OK | GET /api/circuits/virtual-circuit-terminations/ (circuits.virtualcircuittermination) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 86 ms |
+| OK | GET /api/circuits/virtual-circuit-types/ (circuits.virtualcircuittype) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 84 ms |
+| OK | GET /api/circuits/virtual-circuits/ (circuits.virtualcircuit) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 91 ms |
+| OK | GET /api/core/data-sources/ (core.datasource) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 100 ms |
+| OK | GET /api/dcim/cable-bundles/ (dcim.cablebundle) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 123 ms |
+| OK | GET /api/dcim/cables/ (dcim.cable) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 146 ms |
+| OK | GET /api/dcim/console-port-templates/ (dcim.consoleporttemplate) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 92 ms |
+| OK | GET /api/dcim/console-ports/ (dcim.consoleport) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 156 ms |
+| OK | GET /api/dcim/console-server-port-templates/ (dcim.consoleserverporttemplate) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 86 ms |
+| OK | GET /api/dcim/console-server-ports/ (dcim.consoleserverport) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 138 ms |
+| OK | GET /api/dcim/device-bay-templates/ (dcim.devicebaytemplate) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 95 ms |
+| OK | GET /api/dcim/device-bays/ (dcim.devicebay) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 151 ms |
+| OK | GET /api/dcim/device-roles/ (dcim.devicerole) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 126 ms |
+| OK | GET /api/dcim/device-types/ (dcim.devicetype) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 149 ms |
+| OK | GET /api/dcim/devices/ (dcim.device) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 272 ms |
+| OK | GET /api/dcim/front-port-templates/ (dcim.frontporttemplate) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 98 ms |
+| OK | GET /api/dcim/front-ports/ (dcim.frontport) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 164 ms |
+| OK | GET /api/dcim/interface-templates/ (dcim.interfacetemplate) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 126 ms |
+| OK | GET /api/dcim/interfaces/ (dcim.interface) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 233 ms |
+| OK | GET /api/dcim/inventory-item-roles/ (dcim.inventoryitemrole) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 111 ms |
+| OK | GET /api/dcim/inventory-item-templates/ (dcim.inventoryitemtemplate) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 125 ms |
+| OK | GET /api/dcim/inventory-items/ (dcim.inventoryitem) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 180 ms |
+| OK | GET /api/dcim/locations/ (dcim.location) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 136 ms |
+| OK | GET /api/dcim/mac-addresses/ (dcim.macaddress) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 124 ms |
+| OK | GET /api/dcim/manufacturers/ (dcim.manufacturer) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 125 ms |
+| OK | GET /api/dcim/module-bay-templates/ (dcim.modulebaytemplate) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 86 ms |
+| OK | GET /api/dcim/module-bays/ (dcim.modulebay) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 783 ms |
+| OK | GET /api/dcim/module-type-profiles/ (dcim.moduletypeprofile) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 137 ms |
+| OK | GET /api/dcim/module-types/ (dcim.moduletype) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 111 ms |
+| OK | GET /api/dcim/modules/ (dcim.module) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 249 ms |
+| OK | GET /api/dcim/platforms/ (dcim.platform) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 123 ms |
+| OK | GET /api/dcim/power-feeds/ (dcim.powerfeed) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 198 ms |
+| OK | GET /api/dcim/power-outlet-templates/ (dcim.poweroutlettemplate) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 115 ms |
+| OK | GET /api/dcim/power-outlets/ (dcim.poweroutlet) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 177 ms |
+| OK | GET /api/dcim/power-panels/ (dcim.powerpanel) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 121 ms |
+| OK | GET /api/dcim/power-port-templates/ (dcim.powerporttemplate) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 111 ms |
+| OK | GET /api/dcim/power-ports/ (dcim.powerport) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 157 ms |
+| OK | GET /api/dcim/rack-groups/ (dcim.rackgroup) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 81 ms |
+| OK | GET /api/dcim/rack-reservations/ (dcim.rackreservation) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 110 ms |
+| OK | GET /api/dcim/rack-roles/ (dcim.rackrole) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 87 ms |
+| OK | GET /api/dcim/rack-types/ (dcim.racktype) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 101 ms |
 | OK | GET /api/dcim/racks/ (dcim.rack) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 162 ms |
-| OK | GET /api/dcim/rear-port-templates/ (dcim.rearporttemplate) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 76 ms |
-| OK | GET /api/dcim/rear-ports/ (dcim.rearport) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 152 ms |
-| OK | GET /api/dcim/regions/ (dcim.region) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 91 ms |
+| OK | GET /api/dcim/rear-port-templates/ (dcim.rearporttemplate) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 92 ms |
+| OK | GET /api/dcim/rear-ports/ (dcim.rearport) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 154 ms |
+| OK | GET /api/dcim/regions/ (dcim.region) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 107 ms |
 | OK | GET /api/dcim/site-groups/ (dcim.sitegroup) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 87 ms |
-| OK | GET /api/dcim/sites/ (dcim.site) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 143 ms |
-| OK | GET /api/dcim/virtual-chassis/ (dcim.virtualchassis) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 123 ms |
-| OK | GET /api/dcim/virtual-device-contexts/ (dcim.virtualdevicecontext) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 112 ms |
-| OK | GET /api/extras/bookmarks/ (extras.bookmark) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 60 ms |
-| OK | GET /api/extras/config-context-profiles/ (extras.configcontextprofile) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 81 ms |
-| OK | GET /api/extras/config-contexts/ (extras.configcontext) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 99 ms |
-| OK | GET /api/extras/config-templates/ (extras.configtemplate) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 85 ms |
-| OK | GET /api/extras/custom-field-choice-sets/ (extras.customfieldchoiceset) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 65 ms |
+| OK | GET /api/dcim/sites/ (dcim.site) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 141 ms |
+| OK | GET /api/dcim/virtual-chassis/ (dcim.virtualchassis) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 101 ms |
+| OK | GET /api/dcim/virtual-device-contexts/ (dcim.virtualdevicecontext) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 113 ms |
+| OK | GET /api/extras/bookmarks/ (extras.bookmark) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 68 ms |
+| OK | GET /api/extras/config-context-profiles/ (extras.configcontextprofile) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 88 ms |
+| OK | GET /api/extras/config-contexts/ (extras.configcontext) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 107 ms |
+| OK | GET /api/extras/config-templates/ (extras.configtemplate) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 90 ms |
+| OK | GET /api/extras/custom-field-choice-sets/ (extras.customfieldchoiceset) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 72 ms |
 | OK | GET /api/extras/custom-fields/ (extras.customfield) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 103 ms |
-| OK | GET /api/extras/custom-links/ (extras.customlink) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 83 ms |
+| OK | GET /api/extras/custom-links/ (extras.customlink) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 76 ms |
 | OK | GET /api/extras/event-rules/ (extras.eventrule) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 91 ms |
-| OK | GET /api/extras/export-templates/ (extras.exporttemplate) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 71 ms |
-| OK | GET /api/extras/image-attachments/ (extras.imageattachment) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 88 ms |
-| OK | GET /api/extras/journal-entries/ (extras.journalentry) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 85 ms |
-| OK | GET /api/extras/notification-groups/ (extras.notificationgroup) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 52 ms |
-| OK | GET /api/extras/notifications/ (extras.notification) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 55 ms |
-| OK | GET /api/extras/saved-filters/ (extras.savedfilter) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 72 ms |
-| OK | GET /api/extras/scripts/ (extras.script) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 77 ms |
-| OK | GET /api/extras/subscriptions/ (extras.subscription) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 54 ms |
-| OK | GET /api/extras/table-configs/ (extras.tableconfig) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 71 ms |
-| OK | GET /api/extras/tags/ (extras.tag) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 72 ms |
-| OK | GET /api/extras/webhooks/ (extras.webhook) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 92 ms |
-| OK | GET /api/ipam/aggregates/ (ipam.aggregate) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 94 ms |
-| OK | GET /api/ipam/asn-ranges/ (ipam.asnrange) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 88 ms |
-| OK | GET /api/ipam/asns/ (ipam.asn) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 115 ms |
-| OK | GET /api/ipam/fhrp-group-assignments/ (ipam.fhrpgroupassignment) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 69 ms |
-| OK | GET /api/ipam/fhrp-groups/ (ipam.fhrpgroup) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 96 ms |
-| OK | GET /api/ipam/ip-addresses/ (ipam.ipaddress) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 137 ms |
-| OK | GET /api/ipam/ip-ranges/ (ipam.iprange) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 94 ms |
-| OK | GET /api/ipam/prefixes/ (ipam.prefix) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 140 ms |
-| OK | GET /api/ipam/rirs/ (ipam.rir) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 90 ms |
-| OK | GET /api/ipam/roles/ (ipam.role) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 90 ms |
-| OK | GET /api/ipam/route-targets/ (ipam.routetarget) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 87 ms |
-| OK | GET /api/ipam/service-templates/ (ipam.servicetemplate) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 99 ms |
-| OK | GET /api/ipam/services/ (ipam.service) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 139 ms |
-| OK | GET /api/ipam/vlan-groups/ (ipam.vlangroup) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 133 ms |
-| OK | GET /api/ipam/vlan-translation-policies/ (ipam.vlantranslationpolicy) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 81 ms |
-| OK | GET /api/ipam/vlan-translation-rules/ (ipam.vlantranslationrule) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 69 ms |
-| OK | GET /api/ipam/vlans/ (ipam.vlan) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 124 ms |
-| OK | GET /api/ipam/vrfs/ (ipam.vrf) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 98 ms |
-| OK | GET /api/plugins/inventory/asset-roles/ (plugins.inventory.assetrole) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 106 ms |
-| OK | GET /api/plugins/inventory/assets/ (plugins.inventory.asset) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 179 ms |
-| OK | GET /api/plugins/inventory/audit-flowpage-assignments/ (plugins.inventory.auditflowpageassignment) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 55 ms |
-| OK | GET /api/plugins/inventory/audit-flowpages/ (plugins.inventory.auditflowpage) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 61 ms |
-| OK | GET /api/plugins/inventory/audit-flows/ (plugins.inventory.auditflow) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 60 ms |
+| OK | GET /api/extras/export-templates/ (extras.exporttemplate) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 93 ms |
+| OK | GET /api/extras/image-attachments/ (extras.imageattachment) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 90 ms |
+| OK | GET /api/extras/journal-entries/ (extras.journalentry) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 84 ms |
+| OK | GET /api/extras/notification-groups/ (extras.notificationgroup) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 65 ms |
+| OK | GET /api/extras/notifications/ (extras.notification) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 67 ms |
+| OK | GET /api/extras/saved-filters/ (extras.savedfilter) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 71 ms |
+| OK | GET /api/extras/scripts/ (extras.script) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 67 ms |
+| OK | GET /api/extras/subscriptions/ (extras.subscription) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 69 ms |
+| OK | GET /api/extras/table-configs/ (extras.tableconfig) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 97 ms |
+| OK | GET /api/extras/tags/ (extras.tag) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 86 ms |
+| OK | GET /api/extras/webhooks/ (extras.webhook) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 85 ms |
+| OK | GET /api/ipam/aggregates/ (ipam.aggregate) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 87 ms |
+| OK | GET /api/ipam/asn-ranges/ (ipam.asnrange) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 101 ms |
+| OK | GET /api/ipam/asns/ (ipam.asn) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 121 ms |
+| OK | GET /api/ipam/fhrp-group-assignments/ (ipam.fhrpgroupassignment) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 71 ms |
+| OK | GET /api/ipam/fhrp-groups/ (ipam.fhrpgroup) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 98 ms |
+| OK | GET /api/ipam/ip-addresses/ (ipam.ipaddress) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 155 ms |
+| OK | GET /api/ipam/ip-ranges/ (ipam.iprange) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 101 ms |
+| OK | GET /api/ipam/prefixes/ (ipam.prefix) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 135 ms |
+| OK | GET /api/ipam/rirs/ (ipam.rir) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 88 ms |
+| OK | GET /api/ipam/roles/ (ipam.role) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 95 ms |
+| OK | GET /api/ipam/route-targets/ (ipam.routetarget) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 128 ms |
+| OK | GET /api/ipam/service-templates/ (ipam.servicetemplate) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 128 ms |
+| OK | GET /api/ipam/services/ (ipam.service) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 720 ms |
+| OK | GET /api/ipam/vlan-groups/ (ipam.vlangroup) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 113 ms |
+| OK | GET /api/ipam/vlan-translation-policies/ (ipam.vlantranslationpolicy) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 80 ms |
+| OK | GET /api/ipam/vlan-translation-rules/ (ipam.vlantranslationrule) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 80 ms |
+| OK | GET /api/ipam/vlans/ (ipam.vlan) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 147 ms |
+| OK | GET /api/ipam/vrfs/ (ipam.vrf) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 115 ms |
+| OK | GET /api/plugins/inventory/asset-roles/ (plugins.inventory.assetrole) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 121 ms |
+| OK | GET /api/plugins/inventory/assets/ (plugins.inventory.asset) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 200 ms |
+| OK | GET /api/plugins/inventory/audit-flowpage-assignments/ (plugins.inventory.auditflowpageassignment) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 60 ms |
+| OK | GET /api/plugins/inventory/audit-flowpages/ (plugins.inventory.auditflowpage) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 64 ms |
+| OK | GET /api/plugins/inventory/audit-flows/ (plugins.inventory.auditflow) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 63 ms |
 | OK | GET /api/plugins/inventory/audit-trail-sources/ (plugins.inventory.audittrailsource) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 63 ms |
-| OK | GET /api/plugins/inventory/audit-trails/ (plugins.inventory.audittrail) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 60 ms |
-| OK | GET /api/plugins/inventory/deliveries/ (plugins.inventory.delivery) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 85 ms |
-| OK | GET /api/plugins/inventory/inventory-item-groups/ (plugins.inventory.inventoryitemgroup) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 107 ms |
-| OK | GET /api/plugins/inventory/inventory-item-types/ (plugins.inventory.inventoryitemtype) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 97 ms |
-| OK | GET /api/plugins/inventory/purchases/ (plugins.inventory.purchase) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 90 ms |
-| OK | GET /api/plugins/inventory/suppliers/ (plugins.inventory.supplier) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 79 ms |
-| OK | GET /api/tenancy/contact-assignments/ (tenancy.contactassignment) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 79 ms |
-| OK | GET /api/tenancy/contact-groups/ (tenancy.contactgroup) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 85 ms |
-| OK | GET /api/tenancy/contact-roles/ (tenancy.contactrole) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 75 ms |
-| OK | GET /api/tenancy/contacts/ (tenancy.contact) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 84 ms |
-| OK | GET /api/tenancy/tenant-groups/ (tenancy.tenantgroup) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 87 ms |
-| OK | GET /api/tenancy/tenants/ (tenancy.tenant) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 110 ms |
-| OK | GET /api/users/groups/ (users.group) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 61 ms |
-| OK | GET /api/users/owner-groups/ (users.ownergroup) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 64 ms |
-| OK | GET /api/users/owners/ (users.owner) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 64 ms |
-| OK | GET /api/users/permissions/ (users.permission) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 68 ms |
-| OK | GET /api/users/tokens/ (users.token) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 83 ms |
-| OK | GET /api/users/users/ (users.user) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 102 ms |
-| OK | GET /api/virtualization/cluster-groups/ (virtualization.clustergroup) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 84 ms |
-| OK | GET /api/virtualization/cluster-types/ (virtualization.clustertype) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 85 ms |
-| OK | GET /api/virtualization/clusters/ (virtualization.cluster) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 167 ms |
-| OK | GET /api/virtualization/interfaces/ (virtualization.interface) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 141 ms |
-| OK | GET /api/virtualization/virtual-disks/ (virtualization.virtualdisk) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 103 ms |
-| OK | GET /api/virtualization/virtual-machine-types/ (virtualization.virtualmachinetype) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 115 ms |
-| OK | GET /api/virtualization/virtual-machines/ (virtualization.virtualmachine) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 209 ms |
-| OK | GET /api/vpn/ike-policies/ (vpn.ikepolicy) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 105 ms |
-| OK | GET /api/vpn/ike-proposals/ (vpn.ikeproposal) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 97 ms |
-| OK | GET /api/vpn/ipsec-policies/ (vpn.ipsecpolicy) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 91 ms |
-| OK | GET /api/vpn/ipsec-profiles/ (vpn.ipsecprofile) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 90 ms |
-| OK | GET /api/vpn/ipsec-proposals/ (vpn.ipsecproposal) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 82 ms |
-| OK | GET /api/vpn/l2vpn-terminations/ (vpn.l2vpntermination) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 94 ms |
-| OK | GET /api/vpn/l2vpns/ (vpn.l2vpn) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 121 ms |
-| OK | GET /api/vpn/tunnel-groups/ (vpn.tunnelgroup) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 88 ms |
-| OK | GET /api/vpn/tunnel-terminations/ (vpn.tunneltermination) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 100 ms |
-| OK | GET /api/vpn/tunnels/ (vpn.tunnel) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 143 ms |
-| OK | GET /api/wireless/wireless-lan-groups/ (wireless.wirelesslangroup) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 86 ms |
-| OK | GET /api/wireless/wireless-lans/ (wireless.wirelesslan) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 113 ms |
-| OK | GET /api/wireless/wireless-links/ (wireless.wirelesslink) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 98 ms |
+| OK | GET /api/plugins/inventory/audit-trails/ (plugins.inventory.audittrail) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 56 ms |
+| OK | GET /api/plugins/inventory/deliveries/ (plugins.inventory.delivery) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 87 ms |
+| OK | GET /api/plugins/inventory/inventory-item-groups/ (plugins.inventory.inventoryitemgroup) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 106 ms |
+| OK | GET /api/plugins/inventory/inventory-item-types/ (plugins.inventory.inventoryitemtype) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 110 ms |
+| OK | GET /api/plugins/inventory/purchases/ (plugins.inventory.purchase) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 105 ms |
+| OK | GET /api/plugins/inventory/suppliers/ (plugins.inventory.supplier) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 80 ms |
+| OK | GET /api/tenancy/contact-assignments/ (tenancy.contactassignment) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 82 ms |
+| OK | GET /api/tenancy/contact-groups/ (tenancy.contactgroup) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 91 ms |
+| OK | GET /api/tenancy/contact-roles/ (tenancy.contactrole) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 77 ms |
+| OK | GET /api/tenancy/contacts/ (tenancy.contact) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 87 ms |
+| OK | GET /api/tenancy/tenant-groups/ (tenancy.tenantgroup) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 95 ms |
+| OK | GET /api/tenancy/tenants/ (tenancy.tenant) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 127 ms |
+| OK | GET /api/users/groups/ (users.group) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 76 ms |
+| OK | GET /api/users/owner-groups/ (users.ownergroup) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 74 ms |
+| OK | GET /api/users/owners/ (users.owner) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 67 ms |
+| OK | GET /api/users/permissions/ (users.permission) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 71 ms |
+| OK | GET /api/users/tokens/ (users.token) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 82 ms |
+| OK | GET /api/users/users/ (users.user) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 94 ms |
+| OK | GET /api/virtualization/cluster-groups/ (virtualization.clustergroup) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 90 ms |
+| OK | GET /api/virtualization/cluster-types/ (virtualization.clustertype) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 89 ms |
+| OK | GET /api/virtualization/clusters/ (virtualization.cluster) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 148 ms |
+| OK | GET /api/virtualization/interfaces/ (virtualization.interface) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 154 ms |
+| OK | GET /api/virtualization/virtual-disks/ (virtualization.virtualdisk) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 98 ms |
+| OK | GET /api/virtualization/virtual-machine-types/ (virtualization.virtualmachinetype) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 98 ms |
+| OK | GET /api/virtualization/virtual-machines/ (virtualization.virtualmachine) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 242 ms |
+| OK | GET /api/vpn/ike-policies/ (vpn.ikepolicy) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 79 ms |
+| OK | GET /api/vpn/ike-proposals/ (vpn.ikeproposal) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 91 ms |
+| OK | GET /api/vpn/ipsec-policies/ (vpn.ipsecpolicy) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 83 ms |
+| OK | GET /api/vpn/ipsec-profiles/ (vpn.ipsecprofile) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 84 ms |
+| OK | GET /api/vpn/ipsec-proposals/ (vpn.ipsecproposal) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 89 ms |
+| OK | GET /api/vpn/l2vpn-terminations/ (vpn.l2vpntermination) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 112 ms |
+| OK | GET /api/vpn/l2vpns/ (vpn.l2vpn) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 88 ms |
+| OK | GET /api/vpn/tunnel-groups/ (vpn.tunnelgroup) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 82 ms |
+| OK | GET /api/vpn/tunnel-terminations/ (vpn.tunneltermination) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 91 ms |
+| OK | GET /api/vpn/tunnels/ (vpn.tunnel) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 107 ms |
+| OK | GET /api/wireless/wireless-lan-groups/ (wireless.wirelesslangroup) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 84 ms |
+| OK | GET /api/wireless/wireless-lans/ (wireless.wirelesslan) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 110 ms |
+| OK | GET /api/wireless/wireless-links/ (wireless.wirelesslink) | HTTP 200 — the registry claims this endpoint exists | HTTP 200 in 104 ms |
 
 ### 3. List envelope shape
 

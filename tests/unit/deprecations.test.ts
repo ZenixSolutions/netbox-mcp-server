@@ -368,9 +368,14 @@ describe("reachability", () => {
       const operation: Operation = fieldLevel ? "create" : "list";
       const result = await callDescribe(client, entry.objectType, operation);
       expect(result.isError, `${entry.target} did not describe`).toBe(false);
-      expect(result.notes, `${entry.target} produced no note`).toContain(
-        deprecationNote(entry),
-      );
+      // Presence-aware: a field-level note now reads against the instance's
+      // own field list, so compare on the stable head rather than the whole
+      // rendered string.
+      const head = deprecationNote(entry).split(". ")[0] ?? "";
+      expect(
+        result.notes.some((note) => note.startsWith(head)),
+        `${entry.target} produced no note`,
+      ).toBe(true);
       expect(result.text).toContain(entry.source);
       readOnlyOnThisInstance.add(entry.objectType);
     }
@@ -528,15 +533,59 @@ describe("advisory only", () => {
   });
 });
 
+const moduleLocalContext = DEPRECATIONS.find(
+  (entry) => entry.target === "dcim.module.local_context_data",
+);
+if (!moduleLocalContext) throw new Error("dcim.module.local_context_data left the table");
+
 describe("removals, which read differently from deprecations", () => {
   it("says REMOVED when a release took the field away outright", () => {
     const note = described("dcim.module", "create").notes[0] ?? "";
     expect(note).toMatch(/^REMOVED: Field `local_context_data` on `dcim.module`/);
-    // A patch release is the point: this worked on 4.6.2.
+    // A patch release is the point: 4.6.3, not a minor bump.
     expect(note).toContain("NetBox REMOVED this in 4.6.3");
-    expect(note).toContain("older than 4.6.3 still accepts it");
     // Nothing to be advisory about — it is already gone.
     expect(note).not.toContain("This is advisory");
+  });
+
+  /**
+   * This wording was refuted by a live run and is now checked against the
+   * instance instead of asserted from the table.
+   *
+   * The note used to end "It worked on earlier releases, so an instance older
+   * than 4.6.3 still accepts it." A contract run against a real NetBox **4.6.0**
+   * showed `local_context_data` absent from that instance's derived write
+   * schema — NetBox's own release note calls the field "unused", so it was
+   * very likely never writable through the API at all. The table knew a version
+   * number and inferred behaviour from it; the connected instance is the only
+   * evidence actually available.
+   */
+  it("never claims an older instance accepts a removed field", () => {
+    for (const objectType of ["dcim.module", "dcim.frontport"] as const) {
+      for (const note of described(objectType, "create").notes) {
+        expect(note).not.toMatch(/still accepts it|worked on earlier releases/);
+      }
+    }
+  });
+
+  it("reads a removal against the instance's own field list", () => {
+    // Absent: explains why the field is missing rather than guessing.
+    const absent = deprecationNote(moduleLocalContext, "absent");
+    expect(absent).toContain("That is why it is not in the fields above");
+    expect(absent).toContain("this instance does not accept it");
+
+    // Present: the instance predates the removal, so the field works NOW and
+    // breaks on upgrade — the one case where a caller needs a timeline.
+    const present = deprecationNote(moduleLocalContext, "present");
+    expect(present).toContain("predates that release");
+    expect(present).toContain("stops working on upgrade");
+
+    // Unknown: no field list to check (an object-type entry, or list/get), so
+    // it states the removal and stops.
+    const unknown = deprecationNote(moduleLocalContext, "unknown");
+    expect(unknown).toContain("NetBox REMOVED this in 4.6.3");
+    expect(unknown).not.toContain("this instance");
+    expect(unknown).not.toContain("predates");
   });
 
   it("explains the FrontPort port-mapping replacement", () => {
